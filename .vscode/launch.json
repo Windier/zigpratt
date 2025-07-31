@@ -1,0 +1,26 @@
+{
+    "version": "0.2.0",
+    "configurations": [
+        {
+            "name": "Debug Zig (Simple)",
+            "type": "lldb",
+            "request": "launch",
+            "program": "${workspaceFolder}/zig-out/bin/test.exe",
+            "cwd": "${workspaceFolder}",
+            "preLaunchTask": "Build (Debug)"
+        },
+        {
+            "name": "Debug Zig Test (Stop at Entry)",
+            "type": "lldb",
+            "request": "launch",
+            "program": "${workspaceFolder}/zig-out/bin/test.exe",
+            "args": [],
+            "cwd": "${workspaceFolder}",
+            "console": "integratedTerminal",
+            "preLaunchTask": "Build (Fast)",
+            "stopOnEntry": true,
+            "sourceLanguages": ["zig"]
+        }
+    ]
+}
+

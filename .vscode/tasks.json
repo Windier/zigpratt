@@ -1,0 +1,100 @@
+{
+    "version": "2.0.0",
+  "tasks": [
+    {
+      "command": "zig build -Doptimize=Debug",
+      "group": {
+        "kind": "build",
+        "isDefault": true
+      },
+      "label": "Build (Debug)",
+      "presentation": {
+        "clear": true,
+        "reveal": "always",
+        "panel": "shared"
+      },
+      "type": "shell"
+    },
+    {
+      // using "args" quotes 'zig build' and breaks the command
+      "command": "zig build --release=fast",
+      "group": {
+        "kind": "build",
+        "isDefault": false
+      },
+      "label": "Build (Fast)",
+      "presentation": {
+        "clear": true,
+        "reveal": "always",
+        "panel": "shared"
+      },
+      "type": "shell"
+    },
+    {
+      // using "args" quotes 'zig build' and breaks the command
+      "command": "zig build --release=safe",
+      "group": {
+        "kind": "build",
+        "isDefault": false
+      },
+      "label": "Build (Safe)",
+      "presentation": {
+        "clear": true,
+        "reveal": "always",
+        "panel": "shared"
+      },
+      "type": "shell"
+    },
+    {
+      // using "args" quotes 'zig build' and breaks the command
+      "command": "zig build --release=small",
+      "group": {
+        "kind": "build",
+        "isDefault": false
+      },
+      "label": "Build (Small)",
+      "presentation": {
+        "clear": true,
+        "reveal": "always",
+        "panel": "shared"
+      },
+      "type": "shell"
+    },
+    {
+      "command": "zig run ${file} -lc",
+      "group": {
+        "kind": "build",
+        "isDefault": false
+      },
+      "label": "Run File",
+      "presentation": {
+        "clear": true,
+        "reveal": "always",
+        "panel": "shared"
+      },
+      "type": "shell"
+    },
+    {
+      "command": "zig build test",
+      "group": "test",
+      "label": "Test All",
+      "presentation": {
+        "clear": true,
+        "reveal": "always",
+        "panel": "shared"
+      },
+      "type": "shell"
+    },
+    {
+      "command": "zig test ${file} -lc",
+      "group": "test",
+      "label": "Test File",
+      "presentation": {
+        "clear": true,
+        "reveal": "always",
+        "panel": "shared"
+      },
+      "type": "shell"
+    }
+  ]
+}
