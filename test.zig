@@ -84,7 +84,7 @@ pub fn getKeyword(text: []const u8) ?TokenType {
     return keywords.get(text);
 }
 
-const Loc = struct { from: usize, to: usize};
+const Loc = struct { from: usize, to: usize };
 const _Token = struct { tag: TokenType, pos: Loc };
 
 const TokenStream = ArrayList(_Token);
@@ -121,9 +121,8 @@ pub const Tokenizer = struct {
             .index = 0,
         };
     }
-    
-    pub fn next(self: *Tokenizer) ?_Token {
 
+    pub fn next(self: *Tokenizer) ?_Token {
         var result: _Token = .{ .tag = undefined, .pos = .{
             .from = self.index,
             .to = undefined,
@@ -308,17 +307,9 @@ pub const Tokenizer = struct {
     }
 };
 
-const Expr = enum {
-  Op,
-  Atom,
-  Invalid
-};
+const Expr = enum { Op, Atom, Invalid };
 
-const Tag = enum {
-  Number,
-  Variable,
-  BinaryOperation
-};
+const Tag = enum { Number, Variable, BinaryOperation };
 
 const ExprType = enum {
     Add,
@@ -330,10 +321,10 @@ const ExprType = enum {
 };
 
 const Expression = struct {
-  type: ExprType,
-  value: ? union {i: i64, f: f64},
-  pos: Loc,
-  children: ?[*]Expression // Might be null for literals
+    type: ExprType,
+    value: ?union { i: i64, f: f64 },
+    pos: Loc,
+    children: ?[*]Expression, // Might be null for literals
 };
 
 fn infixBindingPower(op: TokenType) !struct { u8, u8 } {
@@ -344,123 +335,69 @@ fn infixBindingPower(op: TokenType) !struct { u8, u8 } {
     }
 }
 
-pub fn Parser(token_stream: TokenStream, _: [:0]const u8, head: usize, allocator: std.mem.Allocator) !Expression {
-
-  var index = head;
-  var token: _Token = undefined;
-
-  token = token_stream.items[index];
-
-  const lhs: Expression = switch (token.tag){
-    .Integer => Expression{ .type = .Number, .value = .{ .i = 1 }, .pos = token.pos, .children = null},
-    else => Expression{ .type = .Invalid, .value = null, .pos = token.pos, .children = null},
-  };
-
-  index += 1; // This should be peek, not advance
-  token = token_stream.items[index];
-  const l_bp, const r_bp = try infixBindingPower(token.tag);
-  std.debug.print("LBP: {}, RBP: {}\n", .{ l_bp, r_bp }); 
-
-  const op: ExprType = switch (token.tag){
-    .BinaryOp => .Add,
-    else => .Invalid,
-  };
-
-  index += 1;
-  token = token_stream.items[index];
-  const rhs = switch (token.tag){
-    .Integer => Expression{ .type = .Number, .value = .{ .i = 1 }, .pos = token.pos, .children = null},
-    else => Expression{ .type = .Invalid, .value = null, .pos = token.pos, .children = null},
-  };
-
-  // Allocate memory for the children array
-  const children = try allocator.alloc(Expression, 2);
-  children[0] = lhs;
-  children[1] = rhs;
-
-  return Expression{ 
-    .type = op, 
-    .value = null, 
-    .pos = .{ .from = 0, .to = 0 }, 
-    .children = children.ptr 
-  };
-
-}
-
-const ParserS = struct {
+const Parser = struct {
     token_stream: TokenStream,
     expr: [:0]const u8,
     head: usize,
     current: _Token,
     allocator: std.mem.Allocator,
 
-    pub fn init( token_stream: TokenStream, expr: [:0]const u8, allocator: std.mem.Allocator ) ParserS {
-      return .{ .token_stream = token_stream, .expr = expr, .head = 0, .allocator = allocator};
+    pub fn init(token_stream: TokenStream, expr: [:0]const u8, allocator: std.mem.Allocator) Parser {
+        return .{ .token_stream = token_stream, .expr = expr, .head = 0, .current = .{ .tag = .Eof, .pos = .{ .from = 0, .to = 0 } }, .allocator = allocator };
     }
 
-    pub fn advance(self: *ParserS) Token_ {
-      self.head += 1;
-      if (self.head  >= token_stream.len) {
-        return Token_.Eof;
-      }
-      return token_stream[self.head];
+    pub fn next(self: *Parser) _Token {
+        if (self.head >= self.token_stream.items.len) {
+            self.current = .{ .tag = .Eof, .pos = .{ .from = 0, .to = 0 } };
+            return self.current;
+        }
+        self.current = self.token_stream.items[self.head];
+        self.head += 1;
+        return self.current;
     }
 
-    pub fn peek(self: *ParserS) Token_ {
-      const next_index = self.head + 1;
-      if (next_index  >= token_stream.len) {
-        return Token_.Eof;
-      }
-      return token_stream[next_index];
+    pub fn peek(self: *Parser) _Token {
+        if (self.head >= self.token_stream.items.len) {
+            return .{ .tag = .Eof, .pos = .{ .from = 0, .to = 0 } };
+        }
+        return self.token_stream.items[self.head];
     }
 
-    pub fn parse(self: *ParserS, token_stream: TokenStream, _: [:0]const u8, allocator: std.mem.Allocator) !Expression {
+    pub fn parse(self: *Parser, min_bp: u8) !Expression {
+        const lhs: Expression =
+            switch (self.next().tag) {
+                .Integer => Expression{ .type = .Number, .value = .{ .i = 1 }, .pos = self.current.pos, .children = null },
+                else => Expression{ .type = .Invalid, .value = null, .pos = self.current.pos, .children = null },
+            };
 
-      var index = self.head;
-      self.current = token_stream.items[index];
+        const op = self.peek();
+        const l_bp, const r_bp = try infixBindingPower(op.tag);
+        std.debug.print("LBP: {}, RBP: {}, Min BP: {}\n", .{ l_bp, r_bp, min_bp });
 
-      const lhs: Expression = 
-        switch (self.current.tag){
-          .Integer => Expression{ .type = .Number, .value = .{ .i = 1 }, .pos = self.current.pos, .children = null},
-          else => Expression{ .type = .Invalid, .value = null, .pos = self.current.pos, .children = null},
-        };
+        const rhs =
+            switch (self.next().tag) {
+                .Integer => Expression{ .type = .Number, .value = .{ .i = 1 }, .pos = self.current.pos, .children = null },
+                else => Expression{ .type = .Invalid, .value = null, .pos = self.current.pos, .children = null },
+            };
 
-      index += 1; // This should be peek, not advance
-      const op = token_stream.items[index];
-      const l_bp, const r_bp = try infixBindingPower(op.tag);
-      std.debug.print("LBP: {}, RBP: {}\n", .{ l_bp, r_bp }); 
+        // Convert TokenType to ExprType
+        const op_type: ExprType =
+            switch (op.tag) {
+                .Plus => .Add,
+                .Minus => .Sub,
+                .Asterisk => .Mul,
+                .Slash => .Div,
+                else => .Invalid,
+            };
 
-      index += 1;
-      self.current = token_stream.items[index];
-      const rhs = switch (self.current.tag){
-        .Integer => Expression{ .type = .Number, .value = .{ .i = 1 }, .pos = self.current.pos, .children = null},
-        else => Expression{ .type = .Invalid, .value = null, .pos = self.current.pos, .children = null},
-      };
+        // Allocate memory for the children array
+        const children = try self.allocator.alloc(Expression, 2);
+        children[0] = lhs;
+        children[1] = rhs;
 
-      // Allocate memory for the children array
-      const children = try allocator.alloc(Expression, 2);
-      children[0] = lhs;
-      children[1] = rhs;
-
-      return Expression{ 
-        .type = op, 
-        .value = null, 
-        .pos = .{ .from = 0, .to = 0 }, 
-        .children = children.ptr 
-      };
+        return Expression{ .type = op_type, .value = null, .pos = .{ .from = 0, .to = 0 }, .children = children.ptr };
     }
-
-    
-}
-
-    // pub fn peek(self: *ParserS) ?_Token {
-    // 	if (self.head + 1 >= self.token_stream.items.len) {
-    // 		return TokenType.Eof;
-    // 	}
-    // 	return self.token_stream.items[self.head];
-    // }
-
-    // pub fn advance(self: *ParserS) ?
+};
 
 pub fn main() !void {
     // Initialize the parsing rules
@@ -472,28 +409,27 @@ pub fn main() !void {
     defer arena.deinit();
     const allocator = arena.allocator();
 
-
     const expr: [:0]const u8 = "3 + 4 * 2 - 1";
     var tokenizer = Tokenizer.init(expr);
     print("-- start -- : {s}\n", .{expr});
 
     while (tokenizer.next()) |token| {
-      if (token.tag == .Eof) { print("--eof--\n", .{}); break; }
-      try token_stream.append(token);
-      tokenizer.dump(&token);
+        if (token.tag == .Eof) {
+            print("--eof--\n", .{});
+            break;
+        }
+        try token_stream.append(token);
+        tokenizer.dump(&token);
     }
 
-    const ast = try Parser(token_stream, expr, 0, allocator);
+    var parser = Parser.init(token_stream, expr, allocator);
+    print("Token stream length: {d}\n", .{token_stream.items.len});
+    const ast = try parser.parse(0);
     print("AST: {}\n", .{ast});
 
-
-
- 
     // print("Successfully parsed expression into AST\n");
     // printAST(ast, 0);
 }
-
-
 
 test "Testing Tokenizer" {
     try testTokenize("3", &.{.Integer});
@@ -556,7 +492,6 @@ test "LaTeX left-right delimiters" {
     try testTokenize("\\left\\{1,2,3\\right\\}", &.{ .Left, .LBrace, .Integer, .Comma, .Integer, .Comma, .Integer, .Right, .RBrace });
 }
 
-
 fn testTokenize(source: [:0]const u8, expected_token_tags: []const TokenType) !void {
     var tokenizer = Tokenizer.init(source);
     for (expected_token_tags) |expected_token_tag| {
@@ -573,4 +508,3 @@ fn testTokenize(source: [:0]const u8, expected_token_tags: []const TokenType) !v
     // Print success
     print("Success: {s}\n", .{source});
 }
-
