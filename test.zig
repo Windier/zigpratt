@@ -171,7 +171,7 @@ pub const Tokenizer = struct {
                     result.tag = .Variable;
                     continue :state .variable;
                 },
-                '+', '-', '*', '/', '^' => {
+                '+', '-', '*', '/', '^', '=' => {
                     result.tag = .Op;
                     self.index += 1;
                 },
@@ -343,6 +343,7 @@ const ExprType = enum {
     Juxt,
     Comma,
     With,
+    Assignment,
     FunctionCall,
     Object,
     UnaryMinus,
@@ -359,6 +360,7 @@ pub const infix_operators = std.StaticStringMap(ExprType).initComptime(.{
   .{ "/", .Div },
   .{ "^", .Pow }, // iMul is used for implicit multiplication, e.g., ab is a iMul b
   .{ ".", .Dot },
+  .{ "=", .Assignment },
   .{ "with", .With },
 });
 
@@ -394,6 +396,7 @@ fn infix_binding_power(op: ?ExprType) error{InvalidOperator}!struct { i8, i8 } {
     .Dot => return .{ 6, 5 },
     .Pow => return .{ 7, 6 },
     .With => return .{ 8, 7 },
+    .Assignment => return .{ 0, 0 },
     else => return error.InvalidOperator,
   }
 }
@@ -577,7 +580,7 @@ pub fn main() !void {
     defer arena.deinit();
     const allocator = arena.allocator();
 
-    const expr: [:0]const u8 = "a\\operatorname{with}b"; // Example expression to parse
+    const expr: [:0]const u8 = "a+b=c+d"; // Example expression to parse
     var tokenizer = Tokenizer.init(expr);
     print("-- start -- : {s}\n", .{expr});
 
@@ -700,7 +703,7 @@ fn printASTHelper(expr: *const Expression, prefix: []const u8, is_last: bool) vo
         print("{s}{s}Number: <no value>\n", .{ prefix, connector });
       }
     },
-    .Add, .Sub, .Mul, .Div, .Dot, .Pow, .Juxt, .Comma, .With => {
+    .Add, .Sub, .Mul, .Div, .Dot, .Pow, .Juxt, .Comma, .With, .Assignment => {
       print("{s}{s}{s}\n", .{ prefix, connector, @tagName(expr.type) });
       if (expr.children) |children| {
         // Create new prefix: extend current with either spaces or vertical bar
