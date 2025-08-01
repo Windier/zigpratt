@@ -322,93 +322,92 @@ const ExprType = enum {
 
 const Expression = struct {
     type: ExprType,
-    value: ?union { i: i64, f: f64 },
+    value: ?union(enum) { i: i64, f: f64 },
     pos: Loc,
     children: ?[*]Expression, // Might be null for literals
 };
 
 fn infixBindingPower(op: TokenType) !struct { u8, u8 } {
-    switch (op) {
-        .Plus, .Minus => return .{ 1, 2 },
-        .Asterisk, .Slash => return .{ 3, 4 },
-        else => @panic("bad op"),
-    }
+  switch (op) {
+    .Plus, .Minus => return .{ 1, 2 },
+    .Asterisk, .Slash => return .{ 3, 4 },
+    else => @panic("bad op"),
+  }
 }
 
 const Parser = struct {
-    token_stream: TokenStream,
-    expr: [:0]const u8,
-    head: usize,
-    current: _Token,
-    allocator: std.mem.Allocator,
+  token_stream: TokenStream,
+  expr: [:0]const u8,
+  head: usize,
+  current: _Token,
+  allocator: std.mem.Allocator,
 
-    pub fn init(token_stream: TokenStream, expr: [:0]const u8, allocator: std.mem.Allocator) Parser {
-        return .{ .token_stream = token_stream, .expr = expr, .head = 0, .current = .{ .tag = .Eof, .pos = .{ .from = 0, .to = 0 } }, .allocator = allocator };
-    }
+  pub fn init(token_stream: TokenStream, expr: [:0]const u8, allocator: std.mem.Allocator) Parser {
+    return .{ .token_stream = token_stream, .expr = expr, .head = 0, .current = .{ .tag = .Eof, .pos = .{ .from = 0, .to = 0 } }, .allocator = allocator };
+  }
 
-    pub fn next(self: *Parser) _Token {
-        if (self.head >= self.token_stream.items.len) {
-            self.current = .{ .tag = .Eof, .pos = .{ .from = 0, .to = 0 } };
-            return self.current;
-        }
-        self.current = self.token_stream.items[self.head];
-        self.head += 1;
+  pub fn next(self: *Parser) _Token {
+    if (self.head >= self.token_stream.items.len) {
+        self.current = .{ .tag = .Eof, .pos = .{ .from = 0, .to = 0 } };
         return self.current;
     }
+    self.current = self.token_stream.items[self.head];
+    self.head += 1;
+    return self.current;
+  }
 
-    pub fn peek(self: *Parser) ?_Token {
-        if (self.head >= self.token_stream.items.len) {
-            return null;
-        }
-        return self.token_stream.items[self.head];
+  pub fn peek(self: *Parser) ?_Token {
+    if (self.head >= self.token_stream.items.len) {
+      return null;
     }
+    return self.token_stream.items[self.head];
+  }
 
-    pub fn parse(self: *Parser, min_bp: u8) !Expression {
-        var lhs: Expression =
-            switch (self.next().tag) {
-                .Integer => Expression{ .type = .Number, .value = .{ .i = 1 }, .pos = self.current.pos, .children = null },
-                else => Expression{ .type = .Invalid, .value = null, .pos = self.current.pos, .children = null },
-            };
+  pub fn parse(self: *Parser, min_bp: u8) !Expression {
 
-        while (self.peek()) |op| {
-            switch (op.tag) {
-                .Eof => break,
-                .Plus, .Minus, .Asterisk => continue,
-                else => @panic("unrecognized op"),
-            }
+    _ = self.next();
+    
+    var lhs: Expression =
+      switch (self.current.tag) {
+        .Integer => Expression{ .type = .Number, .value = .{ .i = 1 }, .pos = self.current.pos, .children = null },
+        else => Expression{ .type = .Invalid, .value = null, .pos = self.current.pos, .children = null },
+      };
 
-            const l_bp, const r_bp = try infixBindingPower(op.tag);
-            if (l_bp < min_bp) break;
+    while (self.peek()) |op| {
+      switch (op.tag) {
+        .Eof => break,
+        .Plus, .Minus, .Asterisk => {}, // Allow these
+        else => @panic("unrecognized op"),
+      }
 
-            std.debug.print("LBP: {}, RBP: {}, Min BP: {}\n", .{ l_bp, r_bp, min_bp });
+      const l_bp, const r_bp = try infixBindingPower(op.tag);
+      if (l_bp < min_bp) break;
 
-            // const rhs =
-            //     switch (self.next().tag) {
-            //         .Integer => Expression{ .type = .Number, .value = .{ .i = 1 }, .pos = self.current.pos, .children = null },
-            //         else => Expression{ .type = .Invalid, .value = null, .pos = self.current.pos, .children = null },
-            //     };
+      _ = self.next(); // Consume the operator token
 
-            const rhs = self.parse(r_bp);
+      std.debug.print("LBP: {}, RBP: {}, Min BP: {}\n", .{ l_bp, r_bp, min_bp });
 
-            // Convert TokenType to ExprType
-            const op_type: ExprType =
-                switch (op.tag) {
-                    .Plus => .Add,
-                    .Minus => .Sub,
-                    .Asterisk => .Mul,
-                    .Slash => .Div,
-                    else => .Invalid,
-                };
+      const rhs: Expression = try self.parse(r_bp);
 
-            // Allocate memory for the children array
-            const children = try self.allocator.alloc(Expression, 2);
-            children[0] = lhs;
-            children[1] = rhs;
+      // Convert TokenType to ExprType
+      const op_type: ExprType =
+        switch (op.tag) {
+          .Plus => .Add,
+          .Minus => .Sub,
+          .Asterisk => .Mul,
+          .Slash => .Div,
+          else => .Invalid,
+        };
 
-            lhs = Expression{ .type = op_type, .value = null, .pos = .{ .from = 0, .to = 0 }, .children = children.ptr };
-        }
-        return lhs;
+      // Allocate memory for the children array
+      const children = try self.allocator.alloc(Expression, 2); // This might be N children for collections (lists/objects etc)
+      children[0] = lhs;
+      children[1] = rhs;
+
+      lhs = Expression{ .type = op_type, .value = null, .pos = .{ .from = 0, .to = 0 }, .children = children.ptr };
     }
+    return lhs;
+  }
 };
 
 pub fn main() !void {
@@ -426,21 +425,21 @@ pub fn main() !void {
     print("-- start -- : {s}\n", .{expr});
 
     while (tokenizer.next()) |token| {
-        if (token.tag == .Eof) {
-            print("--eof--\n", .{});
-            break;
-        }
-        try token_stream.append(token);
-        tokenizer.dump(&token);
+      if (token.tag == .Eof) {
+        print("--eof--\n", .{});
+        break;
+      }
+      try token_stream.append(token);
+      tokenizer.dump(&token);
     }
 
     var parser = Parser.init(token_stream, expr, allocator);
     print("Token stream length: {d}\n", .{token_stream.items.len});
     const ast = try parser.parse(0);
-    print("AST: {}\n", .{ast});
+    print("Expr: {}\n", .{ast});
 
-    // print("Successfully parsed expression into AST\n");
-    // printAST(ast, 0);
+    print("AST\n", .{});
+    printAST(&ast, 0);
 }
 
 test "Testing Tokenizer" {
@@ -507,16 +506,48 @@ test "LaTeX left-right delimiters" {
 fn testTokenize(source: [:0]const u8, expected_token_tags: []const TokenType) !void {
     var tokenizer = Tokenizer.init(source);
     for (expected_token_tags) |expected_token_tag| {
-        const token = tokenizer.next();
+        const token = tokenizer.next().?; // Unwrap the optional
         tokenizer.dump(&token);
         try std.testing.expectEqual(expected_token_tag, token.tag);
     }
 
-    const last_token = tokenizer.next();
+    const last_token = tokenizer.next().?; // Unwrap the optional
     try std.testing.expectEqual(TokenType.Eof, last_token.tag);
     try std.testing.expectEqual(source.len, last_token.pos.from);
     try std.testing.expectEqual(source.len, last_token.pos.to);
 
     // Print success
     print("Success: {s}\n", .{source});
+}
+
+fn printAST(expr: *const Expression, indent: u32) void {
+  const spaces = "                    ";
+  const prefix = spaces[0..@min(indent, spaces.len)];
+
+  switch (expr.type) {
+    .Number => {
+      if (expr.value) |val| {
+        switch (val) {
+          .i => |i| print("{s}Number: {d}\n", .{ prefix, i }),
+          .f => |f| print("{s}Number: {d}\n", .{ prefix, f }),
+        }
+      } else {
+        print("{s}Number: <no value>\n", .{prefix});
+      }
+    },
+    .Add, .Sub, .Mul, .Div => {
+      print("{s}{s}\n", .{ prefix, @tagName(expr.type) });
+      if (expr.children) |children| {
+        // print("{s}|-- Left:\n", .{prefix});
+        printAST(&children[0], indent + 1);
+        // print("{s}\\-- Right:\n", .{prefix});
+        printAST(&children[1], indent + 1);
+      } else {
+        print("{s}\\-- <no children>\n", .{prefix});
+      }
+    },
+    .Invalid => {
+      print("{s}Invalid Expression\n", .{prefix});
+    },
+  }
 }
