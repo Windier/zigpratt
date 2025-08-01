@@ -33,6 +33,7 @@ const TokenType = enum {
     Asterisk,
     Identifier,
     BinaryOp,
+    Op,
     latex_command,
     Slash,
     LParen,
@@ -77,6 +78,8 @@ pub const keywords = std.StaticStringMap(TokenType).initComptime(.{
     .{ "gamma", .Variable },
     .{ "pi", .Constant },
 });
+
+
 
 const Token = struct { type: TokenType, text: ?u8 = null, value: ?i64 = null };
 
@@ -158,30 +161,30 @@ pub const Tokenizer = struct {
                     result.tag = .Variable;
                     continue :state .variable;
                 },
-                // '+', '-', '*', '/', '^' => {
-                //     result.tag = .BinaryOp;
+                '+', '-', '*', '/', '^' => {
+                    result.tag = .Op;
+                    self.index += 1;
+                },
+                // '+' => {
+                //     result.tag = .Plus;
                 //     self.index += 1;
                 // },
-                '+' => {
-                    result.tag = .Plus;
-                    self.index += 1;
-                },
-                '-' => {
-                    result.tag = .Minus;
-                    self.index += 1;
-                },
-                '*' => {
-                    result.tag = .Asterisk;
-                    self.index += 1;
-                },
-                '/' => {
-                    result.tag = .Slash;
-                    self.index += 1;
-                },
-                '^' => {
-                    result.tag = .Caret;
-                    self.index += 1;
-                },
+                // '-' => {
+                //     result.tag = .Minus;
+                //     self.index += 1;
+                // },
+                // '*' => {
+                //     result.tag = .Asterisk;
+                //     self.index += 1;
+                // },
+                // '/' => {
+                //     result.tag = .Slash;
+                //     self.index += 1;
+                // },
+                // '^' => {
+                //     result.tag = .Caret;
+                //     self.index += 1;
+                // },
                 ',' => {
                     result.tag = .Comma;
                     self.index += 1;
@@ -250,7 +253,9 @@ pub const Tokenizer = struct {
             .period => {
                 switch (self.buffer[self.index]) {
                     '0'...'9' => continue :state .decimal_number,
-                    else => {},
+                    else => {
+                      result.tag = .Op;
+                    },
                 }
             },
             .variable => { // If we're here, then we're past the initial letter in a_{123}
@@ -315,10 +320,40 @@ const ExprType = enum {
     Add,
     Sub,
     Mul,
+    iMul,
+    Pow,
     Div,
+    Dot,
+    UnaryMinus,
+    UnaryPlus,
     Number,
+    Variable,
     Invalid,
 };
+
+pub const infix_operators = std.StaticStringMap(ExprType).initComptime(.{
+  .{ "+", .Add },
+  .{ "-", .Sub },
+  .{ "*", .Mul },
+  .{ "/", .Div },
+  .{ "^", .Pow }, // iMul is used for implicit multiplication, e.g., ab is a iMul b
+  .{ ".", .Dot},
+});
+
+pub const prefix_operators = std.StaticStringMap(ExprType).initComptime(.{
+  .{ "+", .UnaryPlus },
+  .{ "-", .UnaryMinus },
+});
+
+pub fn getInfixOperator(text: []const u8, tag: TokenType) ?ExprType {
+    if (tag == .Variable) return .iMul;
+    return infix_operators.get(text);
+}
+
+pub fn getPrefixOperator(text: []const u8) ?ExprType {
+    return prefix_operators.get(text);
+}
+
 
 const Expression = struct {
     type: ExprType,
@@ -327,84 +362,124 @@ const Expression = struct {
     children: ?[*]Expression, // Might be null for literals
 };
 
-fn infixBindingPower(op: TokenType) !struct { u8, u8 } {
-  switch (op) {
-    .Plus, .Minus => return .{ 1, 2 },
-    .Asterisk, .Slash => return .{ 3, 4 },
-    else => @panic("bad op"),
+// const Errors = error {
+//   UnrecognizedOp 
+// }
+
+fn infixBindingPower(op: ?ExprType) error{InvalidOperator}!struct { u8, u8 } {
+  if (op == null) return error.InvalidOperator;
+  switch (op.?) {
+    .Add, .Sub => return .{ 1, 2 },
+    .Mul, .Div => return .{ 3, 4 },
+    .iMul => return .{3, 4},
+    .Dot => return .{ 6, 5 },
+    .Pow => return .{ 7, 6 },
+    else => return error.InvalidOperator,
+  }
+}
+
+fn prefixBindingPower(op: ?ExprType) error{InvalidOperator}!u8 {
+  if (op == null) return error.InvalidOperator;
+  switch (op.?) {
+    .UnaryMinus, .UnaryPlus => return 6,
+    else => return error.InvalidOperator,
   }
 }
 
 const Parser = struct {
   token_stream: TokenStream,
   expr: [:0]const u8,
-  head: usize,
+  head: usize = 0,
   current: _Token,
   allocator: std.mem.Allocator,
 
   pub fn init(token_stream: TokenStream, expr: [:0]const u8, allocator: std.mem.Allocator) Parser {
-    return .{ .token_stream = token_stream, .expr = expr, .head = 0, .current = .{ .tag = .Eof, .pos = .{ .from = 0, .to = 0 } }, .allocator = allocator };
+    return .{ 
+      .token_stream = token_stream, 
+      .expr = expr, 
+      .head = 0, 
+      .current = .{ .tag = .Eof, .pos = .{ .from = 0, .to = 0 } }, .allocator = allocator };
   }
 
-  pub fn next(self: *Parser) _Token {
+  pub fn consume(self: *Parser) void {
     if (self.head >= self.token_stream.items.len) {
-        self.current = .{ .tag = .Eof, .pos = .{ .from = 0, .to = 0 } };
-        return self.current;
+      self.current = .{ .tag = .Eof, .pos = .{ .from = 0, .to = 0 } };
+      return;
     }
     self.current = self.token_stream.items[self.head];
     self.head += 1;
-    return self.current;
   }
 
-  pub fn peek(self: *Parser) ?_Token {
+  pub fn peek(self: *Parser) _Token {
     if (self.head >= self.token_stream.items.len) {
-      return null;
+      return .{ .tag = .Eof, .pos = .{ .from = 0, .to = 0 } };
     }
     return self.token_stream.items[self.head];
   }
 
-  pub fn parse(self: *Parser, min_bp: u8) !Expression {
-
-    _ = self.next();
+  pub const ParserError = error{
+    UnexpectedToken,
+    InvalidOperator,
+    OutOfMemory,
+    Overflow,
+    InvalidCharacter,
+  };  
+  
+  pub fn parse(self: *Parser, min_bp: u8) ParserError!Expression {
     
+    self.consume(); // Consume the first token (likely an atom, but can be an operator too)
+    // self.current now has that token
+    // print token
+    print("Parsing token: {s} at position {d}\n", .{ @tagName(self.current.tag), self.current.pos.from });
+
     var lhs: Expression =
       switch (self.current.tag) {
-        .Integer => Expression{ .type = .Number, .value = .{ .i = 1 }, .pos = self.current.pos, .children = null },
-        else => Expression{ .type = .Invalid, .value = null, .pos = self.current.pos, .children = null },
+        .Integer => Expression{ .type = .Number, .value = .{ .i = try std.fmt.parseInt(i64, self.expr[self.current.pos.from..self.current.pos.to], 10) }, .pos = self.current.pos, .children = null },
+        .Real => Expression{ .type = .Number, .value = .{ .f = try std.fmt.parseFloat(f64, self.expr[self.current.pos.from..self.current.pos.to]) }, .pos = self.current.pos, .children = null },
+        .Variable => Expression{ .type = .Variable, .value = null, .pos = self.current.pos, .children = null },
+        .Op => prefix: {
+          const op_text: []const u8 = self.expr[self.current.pos.from..self.current.pos.to];
+          const op_type: ?ExprType = getPrefixOperator(op_text);
+          if (op_type == null) {
+            return ParserError.InvalidOperator;
+          }
+          const r_bp = try prefixBindingPower(op_type);
+          const expr = try self.parse(r_bp);
+          const children = try self.allocator.alloc(Expression, 1);
+          children[0] = expr;
+          break :prefix Expression{ .type = op_type.?, .value = null, .pos = self.current.pos, .children = children.ptr };
+        },
+        else => return ParserError.UnexpectedToken,
       };
+    
+    print("Parsed lhs: {s} at position {d}\n", .{ @tagName(lhs.type), lhs.pos.from });
 
-    while (self.peek()) |op| {
+    while (true) {
+      const op = self.peek();
+      var implicit_mul: bool = false;
       switch (op.tag) {
+        .Op => {}, // Allow these
+        .Variable => {implicit_mul = true;}, // Implicit multiplication
         .Eof => break,
-        .Plus, .Minus, .Asterisk => {}, // Allow these
-        else => @panic("unrecognized op"),
+        else => return ParserError.UnexpectedToken,
       }
 
-      const l_bp, const r_bp = try infixBindingPower(op.tag);
+      // Convert TokenType to ExprType
+      const op_text: []const u8 = self.expr[op.pos.from..op.pos.to];
+      const op_type: ?ExprType = getInfixOperator(op_text, op.tag);
+      const l_bp, const r_bp = try infixBindingPower(op_type);
       if (l_bp < min_bp) break;
 
-      _ = self.next(); // Consume the operator token
-
-      std.debug.print("LBP: {}, RBP: {}, Min BP: {}\n", .{ l_bp, r_bp, min_bp });
+      if (!implicit_mul) self.consume(); // Consume the operator token
 
       const rhs: Expression = try self.parse(r_bp);
 
-      // Convert TokenType to ExprType
-      const op_type: ExprType =
-        switch (op.tag) {
-          .Plus => .Add,
-          .Minus => .Sub,
-          .Asterisk => .Mul,
-          .Slash => .Div,
-          else => .Invalid,
-        };
-
       // Allocate memory for the children array
-      const children = try self.allocator.alloc(Expression, 2); // This might be N children for collections (lists/objects etc)
+      const children = try self.allocator.alloc(Expression, 2);
       children[0] = lhs;
       children[1] = rhs;
 
-      lhs = Expression{ .type = op_type, .value = null, .pos = .{ .from = 0, .to = 0 }, .children = children.ptr };
+      lhs = Expression{ .type = op_type.?, .value = null, .pos = op.pos, .children = children.ptr };
     }
     return lhs;
   }
@@ -420,7 +495,7 @@ pub fn main() !void {
     defer arena.deinit();
     const allocator = arena.allocator();
 
-    const expr: [:0]const u8 = "3 + 4 * 2 - 1";
+    const expr: [:0]const u8 = "-a*bc^2-a^2";
     var tokenizer = Tokenizer.init(expr);
     print("-- start -- : {s}\n", .{expr});
 
@@ -448,11 +523,11 @@ test "Testing Tokenizer" {
     try testTokenize("a_{1}", &.{.Variable});
     try testTokenize("\\sin", &.{.FunctionName});
     try testTokenize("sin", &.{ .Variable, .Variable, .Variable });
-    try testTokenize("a_{1}+\\sin*3", &.{ .Variable, .Plus, .FunctionName, .Asterisk, .Integer });
+    try testTokenize("a_{1}+\\sin*3", &.{ .Variable, .Op, .FunctionName, .Op, .Integer });
     try testTokenize("\\sin", &.{.FunctionName});
     try testTokenize("\\cos", &.{.FunctionName});
     try testTokenize("abc_{123}", &.{ .Variable, .Variable, .Variable });
-    try testTokenize("a_{1}+\\sin*3.25-2.2.3.3", &.{ .Variable, .Plus, .FunctionName, .Asterisk, .Real, .Minus, .Real, .Real, .Real });
+    try testTokenize("a_{1}+\\sin*3.25-2.2.3.3", &.{ .Variable, .Op, .FunctionName, .Op, .Real, .Op, .Real, .Real, .Real });
     try testTokenize("a_{abc}", &.{.Variable});
     try testTokenize("\\frac{a_{1}}{2}", &.{ .Fraction, .LBrace, .Variable, .RBrace, .LBrace, .Integer, .RBrace });
     try testTokenize("\\left\\{1,2,3\\right\\}", &.{ .Left, .LBrace, .Integer, .Comma, .Integer, .Comma, .Integer, .Right, .RBrace });
@@ -480,7 +555,7 @@ test "Regular variable tokenization" {
 }
 
 test "Complex expression with variables and functions" {
-    try testTokenize("a_{1}+\\sin*3", &.{ .Variable, .Plus, .FunctionName, .Asterisk, .Integer });
+    try testTokenize("a_{1}+\\sin*3", &.{ .Variable, .Op, .FunctionName, .Op, .Integer });
 }
 
 test "Multiple character variables" {
@@ -488,7 +563,7 @@ test "Multiple character variables" {
 }
 
 test "Complex mathematical expression" {
-    try testTokenize("a_{1}+\\sin*3.25-2.2.3.3", &.{ .Variable, .Plus, .FunctionName, .Asterisk, .Real, .Minus, .Real, .Real, .Real });
+    try testTokenize("a_{1}+\\sin*3.25-2.2.3.3", &.{ .Variable, .Op, .FunctionName, .Op, .Real, .Op, .Real, .Real, .Real });
 }
 
 test "Variable with text subscript" {
@@ -525,6 +600,9 @@ fn printAST(expr: *const Expression, indent: u32) void {
   const prefix = spaces[0..@min(indent, spaces.len)];
 
   switch (expr.type) {
+    .Variable => {
+      print("{s}{s}\n", .{ prefix, "Var"});
+    },
     .Number => {
       if (expr.value) |val| {
         switch (val) {
@@ -535,7 +613,7 @@ fn printAST(expr: *const Expression, indent: u32) void {
         print("{s}Number: <no value>\n", .{prefix});
       }
     },
-    .Add, .Sub, .Mul, .Div => {
+    .Add, .Sub, .Mul, .Div, .Dot, .Pow => {
       print("{s}{s}\n", .{ prefix, @tagName(expr.type) });
       if (expr.children) |children| {
         // print("{s}|-- Left:\n", .{prefix});
@@ -546,8 +624,30 @@ fn printAST(expr: *const Expression, indent: u32) void {
         print("{s}\\-- <no children>\n", .{prefix});
       }
     },
+    .iMul => {
+      print("{s}{s}\n", .{ prefix, "Mul" });
+      if (expr.children) |children| {
+        // print("{s}|-- Left:\n", .{prefix});
+        printAST(&children[0], indent + 1);
+        // print("{s}\\-- Right:\n", .{prefix});
+        printAST(&children[1], indent + 1);
+      } else {
+        print("{s}\\-- <no children>\n", .{prefix});
+      }
+    },
+    .UnaryMinus, .UnaryPlus => {
+      print("{s}{s}\n", .{ prefix, @tagName(expr.type) });
+      if (expr.children) |children| {
+        printAST(&children[0], indent + 1);
+      } else {
+        print("{s}\\-- <no children>\n", .{prefix});
+      }
+    },
     .Invalid => {
       print("{s}Invalid Expression\n", .{prefix});
     },
+    // else => {
+    //   @panic("unrecognized node");
+    // }
   }
 }
