@@ -356,46 +356,58 @@ const Parser = struct {
         return self.current;
     }
 
-    pub fn peek(self: *Parser) _Token {
+    pub fn peek(self: *Parser) ?_Token {
         if (self.head >= self.token_stream.items.len) {
-            return .{ .tag = .Eof, .pos = .{ .from = 0, .to = 0 } };
+            return null;
         }
         return self.token_stream.items[self.head];
     }
 
     pub fn parse(self: *Parser, min_bp: u8) !Expression {
-        const lhs: Expression =
+        var lhs: Expression =
             switch (self.next().tag) {
                 .Integer => Expression{ .type = .Number, .value = .{ .i = 1 }, .pos = self.current.pos, .children = null },
                 else => Expression{ .type = .Invalid, .value = null, .pos = self.current.pos, .children = null },
             };
 
-        const op = self.peek();
-        const l_bp, const r_bp = try infixBindingPower(op.tag);
-        std.debug.print("LBP: {}, RBP: {}, Min BP: {}\n", .{ l_bp, r_bp, min_bp });
-
-        const rhs =
-            switch (self.next().tag) {
-                .Integer => Expression{ .type = .Number, .value = .{ .i = 1 }, .pos = self.current.pos, .children = null },
-                else => Expression{ .type = .Invalid, .value = null, .pos = self.current.pos, .children = null },
-            };
-
-        // Convert TokenType to ExprType
-        const op_type: ExprType =
+        while (self.peek()) |op| {
             switch (op.tag) {
-                .Plus => .Add,
-                .Minus => .Sub,
-                .Asterisk => .Mul,
-                .Slash => .Div,
-                else => .Invalid,
-            };
+                .Eof => break,
+                .Plus, .Minus, .Asterisk => continue,
+                else => @panic("unrecognized op"),
+            }
 
-        // Allocate memory for the children array
-        const children = try self.allocator.alloc(Expression, 2);
-        children[0] = lhs;
-        children[1] = rhs;
+            const l_bp, const r_bp = try infixBindingPower(op.tag);
+            if (l_bp < min_bp) break;
 
-        return Expression{ .type = op_type, .value = null, .pos = .{ .from = 0, .to = 0 }, .children = children.ptr };
+            std.debug.print("LBP: {}, RBP: {}, Min BP: {}\n", .{ l_bp, r_bp, min_bp });
+
+            // const rhs =
+            //     switch (self.next().tag) {
+            //         .Integer => Expression{ .type = .Number, .value = .{ .i = 1 }, .pos = self.current.pos, .children = null },
+            //         else => Expression{ .type = .Invalid, .value = null, .pos = self.current.pos, .children = null },
+            //     };
+
+            const rhs = self.parse(r_bp);
+
+            // Convert TokenType to ExprType
+            const op_type: ExprType =
+                switch (op.tag) {
+                    .Plus => .Add,
+                    .Minus => .Sub,
+                    .Asterisk => .Mul,
+                    .Slash => .Div,
+                    else => .Invalid,
+                };
+
+            // Allocate memory for the children array
+            const children = try self.allocator.alloc(Expression, 2);
+            children[0] = lhs;
+            children[1] = rhs;
+
+            lhs = Expression{ .type = op_type, .value = null, .pos = .{ .from = 0, .to = 0 }, .children = children.ptr };
+        }
+        return lhs;
     }
 };
 
