@@ -42,6 +42,10 @@ const TokenType = enum {
     RBrak,
     LBrace,
     RBrace,
+    With,
+    For,
+    OperatorName,
+    Color, 
     Left,
     Right,
     VBar,
@@ -68,6 +72,11 @@ pub const keywords = std.StaticStringMap(TokenType).initComptime(.{
     .{ "{", .LBrace }, // latex: \{
     .{ "}", .RBrace }, // latex : \}
     .{ "frac", .Fraction },
+    .{ "operatorname", .OperatorName }, // LaTeX: \operatorname{with}
+    .{ "with", .With }, // LaTeX: \operatorname{with}
+    .{ "for", .For }, // LaTeX: \operatorname{for}
+    .{ "rgb", .Color }, // LaTeX: \operatorname{rgb}
+
 
     .{ "sin", .FunctionName },
     .{ "cos", .FunctionName },
@@ -102,6 +111,7 @@ pub const Tokenizer = struct {
         variable,
         variable_subscript,
         latex_command,
+        operator_name,
         builtin,
         plus,
         minus,
@@ -260,6 +270,30 @@ pub const Tokenizer = struct {
                     },
                 }
             },
+            .operator_name => {
+              
+              switch (self.buffer[self.index]) {
+                 '{' => {
+                  self.index += 1;
+                  result.pos.from = self.index; // ignore the opening brace
+                  continue :state .operator_name;
+                },
+                'a'...'z', 'A'...'Z' => {self.index += 1; continue :state .operator_name;},
+                else => {
+                  const text = self.buffer[result.pos.from..self.index];
+                  print("Keyword: {s}\n", .{text});
+                  if (getKeyword(text)) |tag| {
+                    result.tag = tag;
+                    result.pos.to = self.index;
+                    self.index += 1;
+                    return result;
+                  }
+                  result.tag = .Invalid;
+                  result.pos.to = self.index;
+                  return result;
+                },
+              }
+            },
             .latex_command => {
                 self.index += 1;
                 result.tag = .latex_command;
@@ -268,7 +302,9 @@ pub const Tokenizer = struct {
                     else => {
                         const text = self.buffer[result.pos.from..self.index];
                         if (getKeyword(text)) |tag| {
-                            // print("Found keyword: {s}\n", .{text});
+                            print("Keyword found: {s} -> {s}\n", .{text, @tagName(tag)});
+                            if (tag == .OperatorName){result.pos.from = self.index; continue :state .operator_name;}
+
                             result.tag = tag;
                             result.pos.to = self.index;
                             return result;
@@ -306,6 +342,7 @@ const ExprType = enum {
     Dot,
     Juxt,
     Comma,
+    With,
     FunctionCall,
     Object,
     UnaryMinus,
@@ -321,7 +358,8 @@ pub const infix_operators = std.StaticStringMap(ExprType).initComptime(.{
   .{ "*", .Mul },
   .{ "/", .Div },
   .{ "^", .Pow }, // iMul is used for implicit multiplication, e.g., ab is a iMul b
-  .{ ".", .Dot},
+  .{ ".", .Dot },
+  .{ "with", .With },
 });
 
 pub const prefix_operators = std.StaticStringMap(ExprType).initComptime(.{
@@ -355,6 +393,7 @@ fn infix_binding_power(op: ?ExprType) error{InvalidOperator}!struct { i8, i8 } {
     .iMul => return .{ 3, 4 },
     .Dot => return .{ 6, 5 },
     .Pow => return .{ 7, 6 },
+    .With => return .{ 8, 7 },
     else => return error.InvalidOperator,
   }
 }
@@ -388,7 +427,6 @@ const Parser = struct {
       return;
     }
     self.current = self.token_stream.items[self.head];
-    // print
     print("Current token: {s} text: {s}\n", .{ @tagName(self.current.tag), self.expr[self.current.pos.from..self.current.pos.to] });
     self.head += 1;
   }
@@ -397,7 +435,6 @@ const Parser = struct {
     if (self.head >= self.token_stream.items.len) {
       return .{ .tag = .Eof, .pos = .{ .from = 0, .to = 0 } };
     }
-    // print peeked token
     print("Peeking token: {s} text: {s}\n", .{ @tagName(self.token_stream.items[self.head].tag), self.expr[self.token_stream.items[self.head].pos.from..self.token_stream.items[self.head].pos.to] });
     return self.token_stream.items[self.head];
   }
@@ -449,7 +486,7 @@ const Parser = struct {
     var level: i32 = 0;
     var commas: u32 = 0;
     for (self.token_stream.items[self.head..]) |token| {
-      print("{s}\n", .{@tagName(token.tag)});
+      // print("{s}\n", .{@tagName(token.tag)});
       switch (token.tag) {
         .LParen =>  { level -= 1; },
         .RParen =>  { if (level == 0) break; level += 1; },
@@ -500,11 +537,11 @@ const Parser = struct {
       const op = self.peek();
       var implicit_mul: bool = false;
       switch (op.tag) {
-        .Op => {}, // Allow these
-        .Variable => {implicit_mul = true;}, // Implicit multiplication
+        .Op, .With => {}, // Allow these
+        .Variable => { implicit_mul = true; }, // Implicit multiplication
         .Eof => break,
         .LParen => {},
-        .Comma => break,
+        .Comma => break, // Comma returns the current expression
         .RParen => break, // Stop parsing on closing parenthesis
         else => return ParserError.UnexpectedToken,
       }
@@ -540,7 +577,7 @@ pub fn main() !void {
     defer arena.deinit();
     const allocator = arena.allocator();
 
-    const expr: [:0]const u8 = "(xy,xy,xy)"; // Example expression to parse
+    const expr: [:0]const u8 = "a\\operatorname{with}b"; // Example expression to parse
     var tokenizer = Tokenizer.init(expr);
     print("-- start -- : {s}\n", .{expr});
 
@@ -663,7 +700,7 @@ fn printASTHelper(expr: *const Expression, prefix: []const u8, is_last: bool) vo
         print("{s}{s}Number: <no value>\n", .{ prefix, connector });
       }
     },
-    .Add, .Sub, .Mul, .Div, .Dot, .Pow, .Juxt, .Comma => {
+    .Add, .Sub, .Mul, .Div, .Dot, .Pow, .Juxt, .Comma, .With => {
       print("{s}{s}{s}\n", .{ prefix, connector, @tagName(expr.type) });
       if (expr.children) |children| {
         // Create new prefix: extend current with either spaces or vertical bar
