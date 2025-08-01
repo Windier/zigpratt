@@ -304,7 +304,10 @@ const ExprType = enum {
     Pow,
     Div,
     Dot,
-		Juxt,
+    Juxt,
+    Comma,
+    FunctionCall,
+    Object,
     UnaryMinus,
     UnaryPlus,
     Number,
@@ -338,24 +341,25 @@ pub fn get_prefix_operator(text: []const u8) ?ExprType {
 
 const Expression = struct {
     type: ExprType,
-    value: ?union(enum) { i: i64, f: f64 },
+    value: ?union(enum) { i: i64, f: f64, length: u64 },
     pos: Loc,
     children: ?[*]Expression, // Might be null for literals
 };
 
-fn infix_binding_power(op: ?ExprType) error{InvalidOperator}!struct { u8, u8 } {
+fn infix_binding_power(op: ?ExprType) error{InvalidOperator}!struct { i8, i8 } {
   if (op == null) return error.InvalidOperator;
   switch (op.?) {
+    .Comma => return .{ -1, -1 },
     .Add, .Sub => return .{ 1, 2 },
     .Mul, .Div => return .{ 3, 4 },
-    .iMul => return .{3, 4},
+    .iMul => return .{ 3, 4 },
     .Dot => return .{ 6, 5 },
     .Pow => return .{ 7, 6 },
     else => return error.InvalidOperator,
   }
 }
 
-fn prefix_binding_power(op: ?ExprType) error{InvalidOperator}!u8 {
+fn prefix_binding_power(op: ?ExprType) error{InvalidOperator}!i8 {
   if (op == null) return error.InvalidOperator;
   switch (op.?) {
     .UnaryMinus, .UnaryPlus => return 6,
@@ -384,8 +388,8 @@ const Parser = struct {
       return;
     }
     self.current = self.token_stream.items[self.head];
-		// print
-		print("Current token: {s} text: {s}\n", .{ @tagName(self.current.tag), self.expr[self.current.pos.from..self.current.pos.to] });
+    // print
+    print("Current token: {s} text: {s}\n", .{ @tagName(self.current.tag), self.expr[self.current.pos.from..self.current.pos.to] });
     self.head += 1;
   }
 
@@ -393,54 +397,99 @@ const Parser = struct {
     if (self.head >= self.token_stream.items.len) {
       return .{ .tag = .Eof, .pos = .{ .from = 0, .to = 0 } };
     }
-		// print peeked token
-		print("Peeking token: {s} text: {s}\n", .{ @tagName(self.token_stream.items[self.head].tag), self.expr[self.token_stream.items[self.head].pos.from..self.token_stream.items[self.head].pos.to] });
+    // print peeked token
+    print("Peeking token: {s} text: {s}\n", .{ @tagName(self.token_stream.items[self.head].tag), self.expr[self.token_stream.items[self.head].pos.from..self.token_stream.items[self.head].pos.to] });
     return self.token_stream.items[self.head];
   }
 
   pub const ParserError = error{
     UnexpectedToken,
+    UnmatchedParentheses,
+    EmptyParentheses,
     InvalidOperator,
     OutOfMemory,
     Overflow,
     InvalidCharacter,
   };  
 
-	pub fn parse_prefix(self: *Parser) ParserError!Expression {
-		const op = self.current;
-		if (op.tag != .Op) return ParserError.UnexpectedToken;
+  pub fn parse_prefix(self: *Parser) ParserError!Expression {
+    const op = self.current;
+    if (op.tag != .Op) return ParserError.UnexpectedToken;
 
-		const op_text: []const u8 = self.expr[op.pos.from..op.pos.to];
-		const op_type: ?ExprType = get_prefix_operator(op_text);
-		if (op_type == null) return ParserError.InvalidOperator;
+    const op_text: []const u8 = self.expr[op.pos.from..op.pos.to];
+    const op_type: ?ExprType = get_prefix_operator(op_text);
+    if (op_type == null) return ParserError.InvalidOperator;
 
-		const r_bp = try prefix_binding_power(op_type);
-		const expr = try self.parse(r_bp);
-		
-		const children = try self.allocator.alloc(Expression, 1); // Allocate memory for the children array
-		children[0] = expr;
+    const r_bp = try prefix_binding_power(op_type);
+    const expr = try self.parse(r_bp);
+    
+    const children = try self.allocator.alloc(Expression, 1); // Allocate memory for the children array
+    children[0] = expr;
 
-		return Expression{ .type = op_type.?, .value = null, .pos = op.pos, .children = children.ptr };
-	}
+    return Expression{ .type = op_type.?, .value = null, .pos = op.pos, .children = children.ptr };
+  }
+
+  // pub fn parse_object(self: *Parser, len: u32) ParserError!Expression {
+
+  //   var children = try self.allocator.alloc(Expression, len);
+  //   for (0..len) |i| {
+  //     children[i] = try self.parse(0);
+  //     // self.consume(); // consume the comma
+  //   }
+
+  //   return Expression{ .type = .Object, .value = null, .pos = self.current.pos, .children = children.ptr };
+
+  // }
+
+// ((x,y,z), y)
+  pub fn parse_paren(self: *Parser) ParserError!Expression {
+    // Paren can be for grouping (has .Comma) or simply to wrap an expression
+
+    // Lookahead for commas
+    var level: i32 = 0;
+    var commas: u32 = 0;
+    for (self.token_stream.items[self.head..]) |token| {
+      print("{s}\n", .{@tagName(token.tag)});
+      switch (token.tag) {
+        .LParen =>  { level -= 1; },
+        .RParen =>  { if (level == 0) break; level += 1; },
+        .Comma =>  { if (level == 0) commas += 1; },
+        else => {},
+      }
+    }
+
+    if (level != 0) return ParserError.UnmatchedParentheses;
+    if (commas == 0) return try self.parse(0); // If there are no commas, it's a parenthesized expression
+
+    const len = commas + 1;
+    var children = try self.allocator.alloc(Expression, len);
+    for (0..len) |i| {
+      children[i] = try self.parse(0);
+      if (i < len - 1) self.consume(); // consume the comma
+    }
+
+    return Expression{ .type = .Object, .value = .{ .length = len }, .pos = self.current.pos, .children = children.ptr };
+
+  }
+
   
-  pub fn parse(self: *Parser, min_bp: u8) ParserError!Expression {
+  pub fn parse(self: *Parser, min_bp: i8) ParserError!Expression {
     
     self.consume(); // Consume the first token (likely an atom, but can be an operator too)
     // self.current now has that token
-		
+    
     var lhs: Expression =
       switch (self.current.tag) {
         .Integer => Expression{ .type = .Number, .value = .{ .i = try std.fmt.parseInt(i64, self.expr[self.current.pos.from..self.current.pos.to], 10) }, .pos = self.current.pos, .children = null },
         .Real => Expression{ .type = .Number, .value = .{ .f = try std.fmt.parseFloat(f64, self.expr[self.current.pos.from..self.current.pos.to]) }, .pos = self.current.pos, .children = null },
         .Variable => Expression{ .type = .Variable, .value = null, .pos = self.current.pos, .children = null },
         .Op => try self.parse_prefix(),
-				.LParen => paren: {
-					// Handle parentheses
-					const expr: Expression = try self.parse(0); // Parse the expression inside parentheses
-					self.consume(); // Consume the ')' token
-					if (self.current.tag != .RParen) return ParserError.UnexpectedToken; // Expect a closing parenthesis
-					break :paren expr;
-				},
+        .LParen => paren: {
+          const expr: Expression = try self.parse_paren(); // Parse the expression inside parentheses
+          self.consume(); // Consume the ')' token
+          if (self.current.tag != .RParen) return ParserError.UnexpectedToken; // Expect a closing parenthesis
+          break :paren expr;
+        },
         
         else => return ParserError.UnexpectedToken,
       };
@@ -454,7 +503,9 @@ const Parser = struct {
         .Op => {}, // Allow these
         .Variable => {implicit_mul = true;}, // Implicit multiplication
         .Eof => break,
-				.RParen => break, // Stop parsing on closing parenthesis
+        .LParen => {},
+        .Comma => break,
+        .RParen => break, // Stop parsing on closing parenthesis
         else => return ParserError.UnexpectedToken,
       }
 
@@ -489,7 +540,7 @@ pub fn main() !void {
     defer arena.deinit();
     const allocator = arena.allocator();
 
-    const expr: [:0]const u8 = "-(a+b)c"; // Example expression to parse
+    const expr: [:0]const u8 = "(xy,xy,xy)"; // Example expression to parse
     var tokenizer = Tokenizer.init(expr);
     print("-- start -- : {s}\n", .{expr});
 
@@ -589,59 +640,86 @@ fn testTokenize(source: [:0]const u8, expected_token_tags: []const TokenType) !v
     print("Success: {s}\n", .{source});
 }
 
-fn printAST(expr: *const Expression, indent: u32) void {
-  const spaces = "                    ";
-  const prefix = spaces[0..@min(indent, spaces.len)];
+fn printAST(expr: *const Expression, _: u32) void {
+  printASTHelper(expr, "", true);
+}
 
+fn printASTHelper(expr: *const Expression, prefix: []const u8, is_last: bool) void {
+  // Print current node with appropriate connector
+  const connector = if (is_last) "+-- " else "|-- ";
+  
   switch (expr.type) {
     .Variable => {
-      print("{s}{s}\n", .{ prefix, "Var"});
+      print("{s}{s}Var\n", .{ prefix, connector });
     },
     .Number => {
       if (expr.value) |val| {
         switch (val) {
-          .i => |i| print("{s}Number: {d}\n", .{ prefix, i }),
-          .f => |f| print("{s}Number: {d}\n", .{ prefix, f }),
+          .i => |i| print("{s}{s}Number: {d}\n", .{ prefix, connector, i }),
+          .f => |f| print("{s}{s}Number: {d}\n", .{ prefix, connector, f }),
+          else => unreachable,
         }
       } else {
-        print("{s}Number: <no value>\n", .{prefix});
+        print("{s}{s}Number: <no value>\n", .{ prefix, connector });
       }
     },
-    .Add, .Sub, .Mul, .Div, .Dot, .Pow, .Juxt => {
-      print("{s}{s}\n", .{ prefix, @tagName(expr.type) });
+    .Add, .Sub, .Mul, .Div, .Dot, .Pow, .Juxt, .Comma => {
+      print("{s}{s}{s}\n", .{ prefix, connector, @tagName(expr.type) });
       if (expr.children) |children| {
-        // print("{s}|-- Left:\n", .{prefix});
-        printAST(&children[0], indent + 1);
-        // print("{s}\\-- Right:\n", .{prefix});
-        printAST(&children[1], indent + 1);
-      } else {
-        print("{s}\\-- <no children>\n", .{prefix});
+        // Create new prefix: extend current with either spaces or vertical bar
+        var new_prefix: [256]u8 = undefined;
+        const extension = if (is_last) "    " else "|   ";
+        const new_len = @min(prefix.len + 4, 252); // Leave room for extension
+        @memcpy(new_prefix[0..prefix.len], prefix);
+        @memcpy(new_prefix[prefix.len..new_len], extension);
+        
+        printASTHelper(&children[0], new_prefix[0..new_len], false);
+        printASTHelper(&children[1], new_prefix[0..new_len], true);
       }
     },
-    .iMul => {
-      print("{s}{s}\n", .{ prefix, "Mul" });
+    .Object => {
+      print("{s}{s}Object\n", .{ prefix, connector });
       if (expr.children) |children| {
-        // print("{s}|-- Left:\n", .{prefix});
-        printAST(&children[0], indent + 1);
-        // print("{s}\\-- Right:\n", .{prefix});
-        printAST(&children[1], indent + 1);
-      } else {
-        print("{s}\\-- <no children>\n", .{prefix});
+        var new_prefix: [256]u8 = undefined;
+        const extension = if (is_last) "    " else "|   ";
+        const new_len = @min(prefix.len + 4, 252);
+        @memcpy(new_prefix[0..prefix.len], prefix);
+        @memcpy(new_prefix[prefix.len..new_len], extension);
+        
+        const length = expr.value.?.length;
+        for (0..length) |i| {
+          const is_last_child = (i == length - 1);
+          printASTHelper(&children[i], new_prefix[0..new_len], is_last_child);
+        }
+      }
+    },
+    .iMul, .FunctionCall => {
+      print("{s}{s}Mul\n", .{ prefix, connector });
+      if (expr.children) |children| {
+        var new_prefix: [256]u8 = undefined;
+        const extension = if (is_last) "    " else "|   ";
+        const new_len = @min(prefix.len + 4, 252);
+        @memcpy(new_prefix[0..prefix.len], prefix);
+        @memcpy(new_prefix[prefix.len..new_len], extension);
+        
+        printASTHelper(&children[0], new_prefix[0..new_len], false);
+        printASTHelper(&children[1], new_prefix[0..new_len], true);
       }
     },
     .UnaryMinus, .UnaryPlus => {
-      print("{s}{s}\n", .{ prefix, @tagName(expr.type) });
+      print("{s}{s}{s}\n", .{ prefix, connector, @tagName(expr.type) });
       if (expr.children) |children| {
-        printAST(&children[0], indent + 1);
-      } else {
-        print("{s}\\-- <no children>\n", .{prefix});
+        var new_prefix: [256]u8 = undefined;
+        const extension = if (is_last) "    " else "|   ";
+        const new_len = @min(prefix.len + 4, 252);
+        @memcpy(new_prefix[0..prefix.len], prefix);
+        @memcpy(new_prefix[prefix.len..new_len], extension);
+        
+        printASTHelper(&children[0], new_prefix[0..new_len], true);
       }
     },
     .Invalid => {
-      print("{s}Invalid Expression\n", .{prefix});
+      print("{s}{s}Invalid Expression\n", .{ prefix, connector });
     },
-    // else => {
-    //   @panic("unrecognized node");
-    // }
   }
 }
