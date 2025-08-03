@@ -305,6 +305,37 @@
             }
         }
         
+        // Function to format the JSON tree by only showing types in a clean tree structure
+        function formatTreeDisplay(node, depth = 0) {
+            const indent = "  ".repeat(depth);
+            
+            if (typeof node === 'string') {
+                return node;
+            }
+            
+            if (!node || typeof node !== 'object') {
+                return String(node);
+            }
+            
+            let result = indent + node.type;
+            
+            if (node.children && Array.isArray(node.children)) {
+                result += "\n";
+                for (let i = 0; i < node.children.length; i++) {
+                    result += formatTreeDisplay(node.children[i], depth + 1);
+                    if (i < node.children.length - 1) {
+                        result += "\n";
+                    }
+                }
+            } else if (node.text) {
+                result += ": " + node.text;
+            } else if (node.value !== undefined) {
+                result += ": " + node.value;
+            }
+            
+            return result;
+        }
+        
         function parseExpression() {
             const expressionInput = document.getElementById('expression');
             const outputFormatSelect = document.getElementById('outputFormat');
@@ -365,7 +396,7 @@
                     if (outputFormat === 'tree') {
                         try {
                             const jsonObj = JSON.parse(result);
-                            resultDiv.textContent = JSON.stringify(jsonObj, null, 2);
+                            resultDiv.textContent = formatTreeDisplay(jsonObj);
                         } catch (e) {
                             resultDiv.textContent = result; // Fallback to raw text
                         }
