@@ -1,0 +1,375 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Zig Pratt Parser</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #f5f5f5;
+            line-height: 1.6;
+        }
+        
+        .container {
+            background: white;
+            padding: 30px;
+            border-radius: 12px;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+        }
+        
+        h1 {
+            color: #2c3e50;
+            text-align: center;
+            margin-bottom: 30px;
+            font-size: 2.2em;
+        }
+        
+        .subtitle {
+            text-align: center;
+            color: #7f8c8d;
+            margin-bottom: 30px;
+            font-style: italic;
+        }
+        
+        .form-group {
+            margin-bottom: 20px;
+        }
+        
+        label {
+            display: block;
+            margin-bottom: 8px;
+            font-weight: 600;
+            color: #34495e;
+        }
+        
+        input[type="text"] {
+            width: 100%;
+            padding: 12px;
+            border: 2px solid #e0e0e0;
+            border-radius: 6px;
+            font-size: 16px;
+            font-family: 'Courier New', monospace;
+            transition: border-color 0.3s ease;
+            box-sizing: border-box;
+        }
+        
+        input[type="text"]:focus {
+            outline: none;
+            border-color: #3498db;
+            box-shadow: 0 0 0 3px rgba(52, 152, 219, 0.1);
+        }
+        
+        button {
+            background: linear-gradient(135deg, #3498db, #2980b9);
+            color: white;
+            padding: 12px 24px;
+            border: none;
+            border-radius: 6px;
+            font-size: 16px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            width: 100%;
+        }
+        
+        button:hover {
+            background: linear-gradient(135deg, #2980b9, #21618c);
+            transform: translateY(-1px);
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.15);
+        }
+        
+        button:active {
+            transform: translateY(0);
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.15);
+        }
+        
+        button:disabled {
+            background: #bdc3c7;
+            cursor: not-allowed;
+            transform: none;
+            box-shadow: none;
+        }
+        
+        .result {
+            margin-top: 20px;
+            padding: 15px;
+            border-radius: 6px;
+            font-family: 'Courier New', monospace;
+            font-size: 14px;
+            white-space: pre-wrap;
+            word-break: break-all;
+            min-height: 50px;
+            border: 2px solid #e0e0e0;
+        }
+        
+        .result.success {
+            background-color: #d5f4e6;
+            border-color: #27ae60;
+            color: #1e8449;
+        }
+        
+        .result.error {
+            background-color: #fadbd8;
+            border-color: #e74c3c;
+            color: #c0392b;
+        }
+        
+        .result.loading {
+            background-color: #fef9e7;
+            border-color: #f39c12;
+            color: #b7950b;
+        }
+        
+        .examples {
+            margin-top: 30px;
+            padding: 20px;
+            background-color: #f8f9fa;
+            border-radius: 6px;
+            border-left: 4px solid #3498db;
+        }
+        
+        .examples h3 {
+            color: #2c3e50;
+            margin-top: 0;
+        }
+        
+        .example-item {
+            margin: 8px 0;
+            padding: 8px;
+            background: white;
+            border-radius: 4px;
+            cursor: pointer;
+            transition: background-color 0.2s ease;
+        }
+        
+        .example-item:hover {
+            background-color: #e8f4f8;
+        }
+        
+        .example-input {
+            font-family: 'Courier New', monospace;
+            font-weight: bold;
+            color: #2980b9;
+        }
+        
+        .example-output {
+            font-family: 'Courier New', monospace;
+            font-size: 0.9em;
+            color: #7f8c8d;
+        }
+        
+        .status {
+            text-align: center;
+            margin: 20px 0;
+            padding: 10px;
+            border-radius: 6px;
+            font-weight: 600;
+        }
+        
+        .status.loading-wasm {
+            background-color: #fef9e7;
+            color: #b7950b;
+            border: 2px solid #f39c12;
+        }
+        
+        .status.ready {
+            background-color: #d5f4e6;
+            color: #1e8449;
+            border: 2px solid #27ae60;
+        }
+        
+        .status.error-wasm {
+            background-color: #fadbd8;
+            color: #c0392b;
+            border: 2px solid #e74c3c;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🧮 Mathematical Expression Parser</h1>
+        <p class="subtitle">Convert mathematical expressions to Polish (prefix) notation using WebAssembly</p>
+        
+        <div id="status" class="status loading-wasm">
+            Loading WebAssembly module...
+        </div>
+        
+        <div class="form-group">
+            <label for="expression">Enter a mathematical expression:</label>
+            <input type="text" id="expression" placeholder="e.g., a+b*c or \\sin x or -x^2+y" disabled>
+        </div>
+        
+        <button id="parseBtn" onclick="parseExpression()" disabled>
+            Parse Expression
+        </button>
+        
+        <div id="result" class="result">
+            Result will appear here...
+        </div>
+        
+        <div class="examples">
+            <h3>📚 Example Expressions (click to try):</h3>
+            <div class="example-item" onclick="tryExample('a+b')">
+                <div class="example-input">a+b</div>
+                <div class="example-output">→ (+ a b)</div>
+            </div>
+            <div class="example-item" onclick="tryExample('a*b+c')">
+                <div class="example-input">a*b+c</div>
+                <div class="example-output">→ (+ (* a b) c)</div>
+            </div>
+            <div class="example-item" onclick="tryExample('a+b*c')">
+                <div class="example-input">a+b*c</div>
+                <div class="example-output">→ (+ a (* b c))</div>
+            </div>
+            <div class="example-item" onclick="tryExample('2^3')">
+                <div class="example-input">2^3</div>
+                <div class="example-output">→ (^ 2 3)</div>
+            </div>
+            <div class="example-item" onclick="tryExample('-a')">
+                <div class="example-input">-a</div>
+                <div class="example-output">→ (-u a)</div>
+            </div>
+            <div class="example-item" onclick="tryExample('\\sin x')">
+                <div class="example-input">\sin x</div>
+                <div class="example-output">→ (call func (args x))</div>
+            </div>
+            <div class="example-item" onclick="tryExample('abc')">
+                <div class="example-input">abc</div>
+                <div class="example-output">→ (*i (*i a b) c)</div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let wasmModule = null;
+        let wasmMemory = null;
+        
+        // Load WebAssembly module
+        async function loadWasm() {
+            try {
+                const response = await fetch('./zig-out/bin/parser.wasm');
+                const bytes = await response.arrayBuffer();
+                const wasmInstance = await WebAssembly.instantiate(bytes, {});
+                
+                wasmModule = wasmInstance.instance.exports;
+                wasmMemory = wasmModule.memory;
+                
+                // Update status
+                document.getElementById('status').textContent = '✅ WebAssembly module loaded successfully!';
+                document.getElementById('status').className = 'status ready';
+                
+                // Enable controls
+                document.getElementById('expression').disabled = false;
+                document.getElementById('parseBtn').disabled = false;
+                
+                // Focus on input
+                document.getElementById('expression').focus();
+                
+            } catch (error) {
+                console.error('Failed to load WASM module:', error);
+                document.getElementById('status').textContent = '❌ Failed to load WebAssembly module: ' + error.message;
+                document.getElementById('status').className = 'status error-wasm';
+            }
+        }
+        
+        function parseExpression() {
+            const expressionInput = document.getElementById('expression');
+            const resultDiv = document.getElementById('result');
+            const parseBtn = document.getElementById('parseBtn');
+            
+            const expression = expressionInput.value.trim();
+            
+            if (!expression) {
+                resultDiv.textContent = 'Please enter an expression';
+                resultDiv.className = 'result error';
+                return;
+            }
+            
+            if (!wasmModule) {
+                resultDiv.textContent = 'WebAssembly module not loaded';
+                resultDiv.className = 'result error';
+                return;
+            }
+            
+            try {
+                // Show loading state
+                resultDiv.textContent = 'Parsing...';
+                resultDiv.className = 'result loading';
+                parseBtn.disabled = true;
+                
+                // Convert string to bytes
+                const encoder = new TextEncoder();
+                const inputBytes = encoder.encode(expression);
+                
+                // Allocate memory in WASM
+                const inputPtr = wasmModule.malloc ? wasmModule.malloc(inputBytes.length) : 0;
+                
+                // Copy input to WASM memory (fallback if malloc is not available)
+                const memoryView = new Uint8Array(wasmMemory.buffer);
+                const startPtr = inputPtr || 1024; // Use a fixed offset if malloc is not available
+                memoryView.set(inputBytes, startPtr);
+                
+                // Call the parser
+                const success = wasmModule.parseExpression(startPtr, inputBytes.length);
+                
+                if (success) {
+                    // Get result
+                    const outputPtr = wasmModule.getOutputPtr();
+                    const outputLen = wasmModule.getOutputLen();
+                    
+                    const outputBytes = new Uint8Array(wasmMemory.buffer, outputPtr, outputLen);
+                    const decoder = new TextDecoder();
+                    const result = decoder.decode(outputBytes);
+                    
+                    resultDiv.textContent = result;
+                    resultDiv.className = 'result success';
+                } else {
+                    // Get error message
+                    const outputPtr = wasmModule.getOutputPtr();
+                    const outputLen = wasmModule.getOutputLen();
+                    
+                    const outputBytes = new Uint8Array(wasmMemory.buffer, outputPtr, outputLen);
+                    const decoder = new TextDecoder();
+                    const errorMsg = decoder.decode(outputBytes);
+                    
+                    resultDiv.textContent = errorMsg;
+                    resultDiv.className = 'result error';
+                }
+                
+                // Clean up memory if malloc was used
+                if (wasmModule.free && inputPtr) {
+                    wasmModule.free(inputPtr);
+                }
+                
+            } catch (error) {
+                console.error('Error parsing expression:', error);
+                resultDiv.textContent = 'Error: ' + error.message;
+                resultDiv.className = 'result error';
+            } finally {
+                parseBtn.disabled = false;
+            }
+        }
+        
+        function tryExample(expression) {
+            document.getElementById('expression').value = expression;
+            parseExpression();
+        }
+        
+        // Handle Enter key
+        document.addEventListener('DOMContentLoaded', function() {
+            document.getElementById('expression').addEventListener('keypress', function(event) {
+                if (event.key === 'Enter') {
+                    parseExpression();
+                }
+            });
+        });
+        
+        // Load WASM on page load
+        loadWasm();
+    </script>
+</body>
+</html>

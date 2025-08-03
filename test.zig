@@ -94,9 +94,9 @@ pub fn getKeyword(text: []const u8) ?TokenType {
 }
 
 const Loc = struct { from: usize, to: usize };
-const _Token = struct { tag: TokenType, pos: Loc };
+pub const _Token = struct { tag: TokenType, pos: Loc };
 
-const TokenStream = ArrayList(_Token);
+pub const TokenStream = ArrayList(_Token);
 
 pub const Tokenizer = struct {
     buffer: [:0]const u8,
@@ -393,7 +393,7 @@ pub fn get_prefix_operator(text: []const u8) ?ExprType {
     return prefix_operators.get(text);
 }
 
-const Expression = struct {
+pub const Expression = struct {
     type: ExprType,
     value: ?union(enum) { i: i64, f: f64, length: u64 },
     pos: Loc,
@@ -424,7 +424,7 @@ fn prefix_binding_power(op: ?ExprType) error{InvalidOperator}!i8 {
     }
 }
 
-const Parser = struct {
+pub const Parser = struct {
     token_stream: TokenStream,
     expr: [:0]const u8,
     head: usize = 0,
@@ -633,7 +633,7 @@ pub fn main() !void {
     defer arena.deinit();
     const allocator = arena.allocator();
 
-    const expr: [:0]const u8 = "\\sin abc"; // Example expression to parse
+    const expr: [:0]const u8 = "\\sin x"; // Example expression to parse
     var tokenizer = Tokenizer.init(expr);
     print("-- start -- : {s}\n", .{expr});
 
@@ -826,7 +826,7 @@ fn testParser(source: [:0]const u8, expected_polish: []const u8) !void {
     print("Success: {s}\n", .{source});
 }
 
-fn polishToString(expr: *const Expression, source: []const u8, buffer: *std.ArrayList(u8)) !void {
+pub fn polishToString(expr: *const Expression, source: []const u8, buffer: *std.ArrayList(u8)) !void {
     const writer = buffer.writer();
     switch (expr.type) {
         .Variable => {
