@@ -57,7 +57,19 @@
             box-sizing: border-box;
         }
         
-        input[type="text"]:focus {
+        select {
+            width: 100%;
+            padding: 12px;
+            border: 2px solid #e0e0e0;
+            border-radius: 6px;
+            font-size: 16px;
+            background-color: white;
+            transition: border-color 0.3s ease;
+            box-sizing: border-box;
+            cursor: pointer;
+        }
+        
+        input[type="text"]:focus, select:focus {
             outline: none;
             border-color: #3498db;
             box-shadow: 0 0 0 3px rgba(52, 152, 219, 0.1);
@@ -203,6 +215,14 @@
             <input type="text" id="expression" placeholder="e.g., a+b*c or \\sin x or -x^2+y" disabled>
         </div>
         
+        <div class="form-group">
+            <label for="outputFormat">Output format:</label>
+            <select id="outputFormat" disabled>
+                <option value="polish">Polish Notation (text)</option>
+                <option value="tree">JSON Tree (object)</option>
+            </select>
+        </div>
+        
         <button id="parseBtn" onclick="parseExpression()" disabled>
             Parse Expression
         </button>
@@ -251,12 +271,20 @@
         // Load WebAssembly module
         async function loadWasm() {
             try {
-                const response = await fetch('./zig-out/bin/parser.wasm');
+                const response = await fetch('./wasm.wasm');
                 const bytes = await response.arrayBuffer();
                 const wasmInstance = await WebAssembly.instantiate(bytes, {});
                 
                 wasmModule = wasmInstance.instance.exports;
                 wasmMemory = wasmModule.memory;
+                
+                // Debug: Log available exports
+                console.log('Available WASM exports:', Object.keys(wasmModule));
+                console.log('malloc available:', typeof wasmModule.malloc);
+                console.log('parseExpression available:', typeof wasmModule.parseExpression);
+                console.log('parseExpressionToTree available:', typeof wasmModule.parseExpressionToTree);
+                console.log('getOutputPtr available:', typeof wasmModule.getOutputPtr);
+                console.log('getOutputLen available:', typeof wasmModule.getOutputLen);
                 
                 // Update status
                 document.getElementById('status').textContent = '✅ WebAssembly module loaded successfully!';
@@ -264,6 +292,7 @@
                 
                 // Enable controls
                 document.getElementById('expression').disabled = false;
+                document.getElementById('outputFormat').disabled = false;
                 document.getElementById('parseBtn').disabled = false;
                 
                 // Focus on input
@@ -278,10 +307,12 @@
         
         function parseExpression() {
             const expressionInput = document.getElementById('expression');
+            const outputFormatSelect = document.getElementById('outputFormat');
             const resultDiv = document.getElementById('result');
             const parseBtn = document.getElementById('parseBtn');
             
             const expression = expressionInput.value.trim();
+            const outputFormat = outputFormatSelect.value;
             
             if (!expression) {
                 resultDiv.textContent = 'Please enter an expression';
@@ -313,8 +344,13 @@
                 const startPtr = inputPtr || 1024; // Use a fixed offset if malloc is not available
                 memoryView.set(inputBytes, startPtr);
                 
-                // Call the parser
-                const success = wasmModule.parseExpression(startPtr, inputBytes.length);
+                // Call the appropriate parser function
+                let success;
+                if (outputFormat === 'tree') {
+                    success = wasmModule.parseExpressionToTree(startPtr, inputBytes.length);
+                } else {
+                    success = wasmModule.parseExpression(startPtr, inputBytes.length);
+                }
                 
                 if (success) {
                     // Get result
@@ -325,7 +361,17 @@
                     const decoder = new TextDecoder();
                     const result = decoder.decode(outputBytes);
                     
-                    resultDiv.textContent = result;
+                    // Format the result based on output type
+                    if (outputFormat === 'tree') {
+                        try {
+                            const jsonObj = JSON.parse(result);
+                            resultDiv.textContent = JSON.stringify(jsonObj, null, 2);
+                        } catch (e) {
+                            resultDiv.textContent = result; // Fallback to raw text
+                        }
+                    } else {
+                        resultDiv.textContent = result;
+                    }
                     resultDiv.className = 'result success';
                 } else {
                     // Get error message
