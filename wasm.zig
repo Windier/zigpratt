@@ -1,9 +1,6 @@
 const std = @import("std");
-
-// Import only the necessary parts from test.zig, avoiding debug prints
 const ArrayList = std.ArrayList;
 
-// Define the types we need locally to avoid importing debug functions
 const TokenType = enum {
 	Variable,
 	Constant,
@@ -74,8 +71,8 @@ pub fn getKeyword(text: []const u8) ?TokenType {
 }
 
 const Loc = struct { from: usize, to: usize };
-const _Token = struct { tag: TokenType, pos: Loc };
-const TokenStream = ArrayList(_Token);
+const Token = struct { tag: TokenType, pos: Loc };
+const TokenStream = ArrayList(Token);
 
 const ExprType = enum {
 	Add,
@@ -161,7 +158,6 @@ fn prefix_binding_power(op: ?ExprType) error{InvalidOperator}!i8 {
 	}
 }
 
-// Simplified Tokenizer for WASM (without debug prints)
 const Tokenizer = struct {
 	buffer: [:0]const u8,
 	index: usize,
@@ -191,8 +187,8 @@ const Tokenizer = struct {
 		};
 	}
 
-	pub fn next(self: *Tokenizer) ?_Token {
-		var result: _Token = .{ .tag = undefined, .pos = .{
+	pub fn next(self: *Tokenizer) ?Token {
+		var result: Token = .{ .tag = undefined, .pos = .{
 			.from = self.index,
 			.to = undefined,
 		} };
@@ -389,7 +385,7 @@ const Parser = struct {
 	token_stream: TokenStream,
 	expr: [:0]const u8,
 	head: usize = 0,
-	current: _Token,
+	current: Token,
 	allocator: std.mem.Allocator,
 
 	pub fn init(token_stream: TokenStream, expr: [:0]const u8, allocator: std.mem.Allocator) Parser {
@@ -405,7 +401,7 @@ const Parser = struct {
 		self.head += 1;
 	}
 
-	pub fn peek(self: *Parser) _Token {
+	pub fn peek(self: *Parser) Token {
 		if (self.head >= self.token_stream.items.len) {
 			return .{ .tag = .Eof, .pos = .{ .from = 0, .to = 0 } };
 		}
@@ -589,9 +585,8 @@ export fn malloc(size: usize) usize {
 	return @intFromPtr(&memory_pool[offset]);
 }
 
-// Export function to free memory (simplified - just reset if freeing from end)
 export fn free(ptr: usize) void {
-	_ = ptr; // We don't actually free in this simple allocator
+	_ = ptr; 
 }
 
 // Export function to get the output buffer pointer
