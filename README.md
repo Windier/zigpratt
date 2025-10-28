@@ -1,5 +1,7 @@
 # Zig Pratt Parser
 
+main source of knowledge: https://matklad.github.io/2020/04/13/simple-but-powerful-pratt-parsing.html
+
 ### Run locally
 ```bash
 zig run parser.zig
