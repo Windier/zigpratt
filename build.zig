@@ -6,9 +6,9 @@ pub fn build(b: *std.Build) void {
 
     // Create the executable
     const exe = b.addExecutable(.{
-        .name = "test",
+        .name = "parser",
         .root_module = b.createModule(.{
-            .root_source_file = b.path("test.zig"),
+            .root_source_file = b.path("parser.zig"),
             .target = target,
             .optimize = optimize,
         }),
@@ -50,7 +50,7 @@ pub fn build(b: *std.Build) void {
     // Create the test executable
     const exe_unit_tests = b.addTest(.{
         .root_module = b.createModule(.{
-            .root_source_file = b.path("test.zig"),
+            .root_source_file = b.path("parser.zig"),
             .target = target,
             .optimize = optimize,
         }),
