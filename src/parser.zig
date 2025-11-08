@@ -1,8 +1,7 @@
 const std = @import("std");
-
 const print = std.debug.print;
 const expect = std.testing.expect;
-const Allocator = std.heap.page_allocator;
+const gpa = std.heap.page_allocator;
 const ArrayList = std.ArrayList;
 
 // a + b -- Add(a,b)
@@ -626,12 +625,12 @@ pub const Parser = struct {
 pub fn main() !void {
     // Initialize the parsing rules
 
-    var token_stream: TokenStream = TokenStream.init(Allocator);
-    defer token_stream.deinit();
+    var token_stream: TokenStream = try .initCapacity(gpa, 128);
+    defer token_stream.deinit(gpa);
 
-    var arena = std.heap.ArenaAllocator.init(std.heap.page_allocator);
-    defer arena.deinit();
-    const allocator = arena.allocator();
+    var arena_impl: std.heap.ArenaAllocator = .init(gpa);
+    defer arena_impl.deinit();
+    const arena = arena_impl.allocator();
 
     const expr: [:0]const u8 = "\\sin x"; // Example expression to parse
     var tokenizer = Tokenizer.init(expr);
@@ -642,11 +641,11 @@ pub fn main() !void {
             print("--eof--\n", .{});
             break;
         }
-        try token_stream.append(token);
+        try token_stream.append(gpa, token);
         tokenizer.dump(&token);
     }
 
-    var parser = Parser.init(token_stream, expr, allocator);
+    var parser = Parser.init(token_stream, expr, arena);
     print("Token stream length: {d}\n", .{token_stream.items.len});
     const ast = try parser.parse(0);
     print("Expr: {}\n", .{ast});
@@ -655,8 +654,8 @@ pub fn main() !void {
     printAST(&ast, 0);
 
     print("AST (Polish):\n", .{});
-    var polish_buffer = std.ArrayList(u8).init(allocator);
-    defer polish_buffer.deinit();
+    var polish_buffer: std.ArrayList(u8) = try .initCapacity(arena, 16);
+    defer polish_buffer.deinit(arena);
     try polishToString(&ast, expr, &polish_buffer);
     print("{s}\n", .{polish_buffer.items});
 }
@@ -788,7 +787,7 @@ fn printAST(expr: *const Expression, _: u32) void {
 }
 
 fn testParser(source: [:0]const u8, expected_polish: []const u8) !void {
-    var token_stream: TokenStream = TokenStream.init(Allocator);
+    var token_stream: TokenStream = TokenStream.init(gpa);
     defer token_stream.deinit();
 
     var arena = std.heap.ArenaAllocator.init(std.heap.page_allocator);
@@ -827,7 +826,7 @@ fn testParser(source: [:0]const u8, expected_polish: []const u8) !void {
 }
 
 pub fn polishToString(expr: *const Expression, source: []const u8, buffer: *std.ArrayList(u8)) !void {
-    const writer = buffer.writer();
+    var writer: std.Io.Writer = .fixed(buffer.items);
     switch (expr.type) {
         .Variable => {
             try writer.print(" {s}", .{source[expr.pos.from..expr.pos.to]});

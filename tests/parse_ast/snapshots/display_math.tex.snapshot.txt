@@ -1,0 +1,31 @@
+Output Format: ast
+Tokens:
+MathDisplayToggle($$)
+Text(x)
+Superscript(^)
+Text(2)
+Symbol(+)
+Text(y)
+Superscript(^)
+Text(2)
+Symbol(=)
+Text(z)
+Superscript(^)
+Text(2)
+MathDisplayToggle($$)
+Root: ""
+  MathDisplay: "$$"
+  Text: "x"
+  Superscript: "^"
+  Text: "2"
+  Symbol: "+"
+  Text: "y"
+  Superscript: "^"
+  Text: "2"
+  Symbol: "="
+  Text: "z"
+  Superscript: "^"
+  Text: "2"
+  MathDisplay: "$$"
+
+ ----- EXIT CODE: 0 -----

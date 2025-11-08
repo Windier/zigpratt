@@ -8,7 +8,7 @@ pub fn build(b: *std.Build) void {
     const exe = b.addExecutable(.{
         .name = "parser",
         .root_module = b.createModule(.{
-            .root_source_file = b.path("parser.zig"),
+            .root_source_file = b.path("src/parser.zig"),
             .target = target,
             .optimize = optimize,
         }),
@@ -25,7 +25,7 @@ pub fn build(b: *std.Build) void {
     const wasm_lib = b.addExecutable(.{
         .name = "parser",
         .root_module = b.createModule(.{
-            .root_source_file = b.path("wasm.zig"),
+            .root_source_file = b.path("src/wasm.zig"),
             .target = wasm_target,
             .optimize = optimize,
         }),
@@ -50,7 +50,7 @@ pub fn build(b: *std.Build) void {
     // Create the test executable
     const exe_unit_tests = b.addTest(.{
         .root_module = b.createModule(.{
-            .root_source_file = b.path("parser.zig"),
+            .root_source_file = b.path("src/parser.zig"),
             .target = target,
             .optimize = optimize,
         }),

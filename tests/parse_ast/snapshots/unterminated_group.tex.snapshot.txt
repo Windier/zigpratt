@@ -1,0 +1,18 @@
+Output Format: ast
+Tokens:
+ControlSequence(\frac)
+GroupOpen({)
+Text(a)
+GroupClose(})
+GroupOpen({)
+Text(b)
+Root: ""
+  Command: "\frac"
+  Text: "a"
+  Group: "{"
+    Text: "a"
+  Text: "b"
+  Group: "{"
+    Text: "b"
+
+ ----- EXIT CODE: 0 -----

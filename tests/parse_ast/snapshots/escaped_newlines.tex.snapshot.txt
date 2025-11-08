@@ -1,0 +1,21 @@
+Output Format: ast
+Tokens:
+Text(x)
+Symbol(=)
+Text(1)
+NewlineCommand(\\)
+NewlineCommand(\\)
+Text(y)
+Symbol(=)
+Text(2)
+Root: ""
+  Text: "x"
+  Symbol: "="
+  Text: "1"
+  Newline: "\\"
+  Newline: "\\"
+  Text: "y"
+  Symbol: "="
+  Text: "2"
+
+ ----- EXIT CODE: 0 -----

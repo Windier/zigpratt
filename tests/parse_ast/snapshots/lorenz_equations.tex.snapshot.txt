@@ -1,0 +1,83 @@
+Output Format: ast
+Tokens:
+EnvironmentBegin(aligned)
+ControlSequence(\dot)
+GroupOpen({)
+Text(x)
+GroupClose(})
+Alignment(&)
+Symbol(=)
+ControlSequence(\sigma)
+Symbol(()
+Text(y)
+Symbol(-)
+Text(x)
+Symbol())
+NewlineCommand(\\)
+ControlSequence(\dot)
+GroupOpen({)
+Text(y)
+GroupClose(})
+Alignment(&)
+Symbol(=)
+ControlSequence(\rho)
+Text(x)
+Symbol(-)
+Text(y)
+Symbol(-)
+Text(xz)
+NewlineCommand(\\)
+ControlSequence(\dot)
+GroupOpen({)
+Text(z)
+GroupClose(})
+Alignment(&)
+Symbol(=)
+Symbol(-)
+ControlSequence(\beta)
+Text(z)
+Symbol(+)
+Text(xy)
+EnvironmentEnd(aligned)
+Root: ""
+  Environment: "aligned"
+  Command: "\dot"
+  Text: "x"
+  Group: "{"
+    Text: "x"
+  Alignment: "&"
+  Symbol: "="
+  Command: "\sigma"
+  Symbol: "("
+  Text: "y"
+  Symbol: "-"
+  Text: "x"
+  Symbol: ")"
+  Newline: "\\"
+  Command: "\dot"
+  Text: "y"
+  Group: "{"
+    Text: "y"
+  Alignment: "&"
+  Symbol: "="
+  Command: "\rho"
+  Text: "x"
+  Symbol: "-"
+  Text: "y"
+  Symbol: "-"
+  Text: "xz"
+  Newline: "\\"
+  Command: "\dot"
+  Text: "z"
+  Group: "{"
+    Text: "z"
+  Alignment: "&"
+  Symbol: "="
+  Symbol: "-"
+  Command: "\beta"
+  Text: "z"
+  Symbol: "+"
+  Text: "xy"
+  Environment: "aligned"
+
+ ----- EXIT CODE: 0 -----

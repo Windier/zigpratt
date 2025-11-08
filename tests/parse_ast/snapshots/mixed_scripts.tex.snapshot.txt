@@ -1,0 +1,27 @@
+Output Format: ast
+Tokens:
+Text(x)
+Subscript(_)
+Text(i)
+Superscript(^)
+Text(2)
+Symbol(+)
+Text(y)
+Subscript(_)
+Text(j)
+Superscript(^)
+Text(3)
+Root: ""
+  Text: "x"
+  Subscript: "_"
+  Text: "i"
+  Superscript: "^"
+  Text: "2"
+  Symbol: "+"
+  Text: "y"
+  Subscript: "_"
+  Text: "j"
+  Superscript: "^"
+  Text: "3"
+
+ ----- EXIT CODE: 0 -----

@@ -1,0 +1,11 @@
+Output Format: ast
+Tokens:
+NewlineCommand(\\)
+NewlineCommand(\\)
+Comment(% \\$ \\& \\_ \\{ \\})
+Root: ""
+  Newline: "\\"
+  Newline: "\\"
+  Comment: "% \\$ \\& \\_ \\{ \\}"
+
+ ----- EXIT CODE: 0 -----
