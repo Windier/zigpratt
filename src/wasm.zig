@@ -880,12 +880,12 @@ export fn parseExpressionToTree(input_ptr: [*]const u8, input_len: usize) bool {
     const expr: [:0]const u8 = input_writer[0..input_len :0];
 
     // Create arena allocator
-    var arena = std.heap.ArenaAllocator.init(std.heap.page_allocator);
-    defer arena.deinit();
-    const allocator = arena.allocator();
+    var arena_impl = std.heap.ArenaAllocator.init(std.heap.page_allocator);
+    defer arena_impl.deinit();
+    const arena = arena_impl.allocator();
 
     // Parse the expression
-    const result = parseExpressionToTreeInternal(expr, allocator) catch |err| {
+    const result = parseExpressionToTreeInternal(expr, arena) catch |err| {
         const error_msg = switch (err) {
             error.UnexpectedToken => "Error: Unexpected token",
             error.ExpectedSomething => "Error: Expected something",
