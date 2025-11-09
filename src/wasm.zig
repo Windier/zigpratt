@@ -159,7 +159,7 @@ fn prefix_binding_power(op: ?ExprType) error{InvalidOperator}!i8 {
 }
 
 const Tokenizer = struct {
-    buffer: [:0]const u8,
+    writer: [:0]const u8,
     index: usize,
 
     const State = enum {
@@ -180,9 +180,9 @@ const Tokenizer = struct {
         unknown,
     };
 
-    pub fn init(buffer: [:0]const u8) Tokenizer {
+    pub fn init(writer: [:0]const u8) Tokenizer {
         return .{
-            .buffer = buffer,
+            .writer = writer,
             .index = 0,
         };
     }
@@ -193,7 +193,7 @@ const Tokenizer = struct {
             .to = undefined,
         } };
 
-        if (self.index >= self.buffer.len) {
+        if (self.index >= self.writer.len) {
             return .{
                 .tag = .Eof,
                 .pos = .{
@@ -204,7 +204,7 @@ const Tokenizer = struct {
         }
 
         state: switch (State.start) {
-            .start => switch (self.buffer[self.index]) {
+            .start => switch (self.writer[self.index]) {
                 '0'...'9' => {
                     self.index += 1;
                     continue :state .number;
@@ -269,7 +269,7 @@ const Tokenizer = struct {
                 },
             },
             .number => {
-                switch (self.buffer[self.index]) {
+                switch (self.writer[self.index]) {
                     '0'...'9' => {
                         self.index += 1;
                         continue :state .number;
@@ -282,7 +282,7 @@ const Tokenizer = struct {
             },
             .decimal_number => {
                 self.index += 1;
-                switch (self.buffer[self.index]) {
+                switch (self.writer[self.index]) {
                     '0'...'9' => {
                         continue :state .decimal_number;
                     },
@@ -292,7 +292,7 @@ const Tokenizer = struct {
                 }
             },
             .period => {
-                switch (self.buffer[self.index]) {
+                switch (self.writer[self.index]) {
                     '0'...'9' => continue :state .decimal_number,
                     else => {
                         result.tag = .Op;
@@ -301,7 +301,7 @@ const Tokenizer = struct {
             },
             .variable => {
                 self.index += 1;
-                switch (self.buffer[self.index]) {
+                switch (self.writer[self.index]) {
                     '_' => continue :state .variable_subscript,
                     else => {
                         result.tag = .Variable;
@@ -310,7 +310,7 @@ const Tokenizer = struct {
             },
             .variable_subscript => {
                 self.index += 1;
-                switch (self.buffer[self.index]) {
+                switch (self.writer[self.index]) {
                     'a'...'z', 'A'...'Z', '0'...'9', '{' => continue :state .variable_subscript,
                     '}' => {
                         self.index += 1;
@@ -322,7 +322,7 @@ const Tokenizer = struct {
                 }
             },
             .operator_name => {
-                switch (self.buffer[self.index]) {
+                switch (self.writer[self.index]) {
                     '{' => {
                         self.index += 1;
                         result.pos.from = self.index;
@@ -333,7 +333,7 @@ const Tokenizer = struct {
                         continue :state .operator_name;
                     },
                     else => {
-                        const text = self.buffer[result.pos.from..self.index];
+                        const text = self.writer[result.pos.from..self.index];
                         if (getKeyword(text)) |tag| {
                             result.tag = tag;
                             result.pos.to = self.index;
@@ -349,10 +349,10 @@ const Tokenizer = struct {
             .latex_command => {
                 self.index += 1;
                 result.tag = .latex_command;
-                switch (self.buffer[self.index]) {
+                switch (self.writer[self.index]) {
                     'a'...'z', 'A'...'Z' => continue :state .latex_command,
                     else => {
-                        const text = self.buffer[result.pos.from..self.index];
+                        const text = self.writer[result.pos.from..self.index];
                         if (getKeyword(text)) |tag| {
                             if (tag == .OperatorName) {
                                 result.pos.from = self.index;
@@ -563,7 +563,7 @@ const Parser = struct {
 };
 
 // WASM memory for string exchange
-var output_buffer: [2048]u8 = undefined;
+var output_writer: [2048]u8 = undefined;
 var output_len: usize = 0;
 
 // Simple test function to verify WASM loading
@@ -589,9 +589,9 @@ export fn free(ptr: usize) void {
     _ = ptr;
 }
 
-// Export function to get the output buffer pointer
+// Export function to get the output writer pointer
 export fn getOutputPtr() [*]u8 {
-    return &output_buffer;
+    return &output_writer;
 }
 
 // Export function to get the output length
@@ -600,8 +600,7 @@ export fn getOutputLen() usize {
 }
 
 // Simplified polishToString for WASM
-fn wasmPolishToString(expr: *const Expression, source: []const u8, buffer: *std.ArrayList(u8)) !void {
-    var writer: std.Io.Writer = .fixed(buffer.items);
+fn wasmPolishToString(expr: *const Expression, source: []const u8, writer: *std.Io.Writer) !void {
     switch (expr.type) {
         .Variable => {
             try writer.print(" {s}", .{source[expr.pos.from..expr.pos.to]});
@@ -623,86 +622,86 @@ fn wasmPolishToString(expr: *const Expression, source: []const u8, buffer: *std.
         .Add => {
             try writer.print(" (+", .{});
             if (expr.children) |children| {
-                try wasmPolishToString(&children[0], source, buffer);
-                try wasmPolishToString(&children[1], source, buffer);
+                try wasmPolishToString(&children[0], source, writer);
+                try wasmPolishToString(&children[1], source, writer);
             }
             try writer.print(")", .{});
         },
         .Sub => {
             try writer.print(" (-", .{});
             if (expr.children) |children| {
-                try wasmPolishToString(&children[0], source, buffer);
-                try wasmPolishToString(&children[1], source, buffer);
+                try wasmPolishToString(&children[0], source, writer);
+                try wasmPolishToString(&children[1], source, writer);
             }
             try writer.print(")", .{});
         },
         .Mul => {
             try writer.print(" (*", .{});
             if (expr.children) |children| {
-                try wasmPolishToString(&children[0], source, buffer);
-                try wasmPolishToString(&children[1], source, buffer);
+                try wasmPolishToString(&children[0], source, writer);
+                try wasmPolishToString(&children[1], source, writer);
             }
             try writer.print(")", .{});
         },
         .iMul => {
             try writer.print(" (*i", .{});
             if (expr.children) |children| {
-                try wasmPolishToString(&children[0], source, buffer);
-                try wasmPolishToString(&children[1], source, buffer);
+                try wasmPolishToString(&children[0], source, writer);
+                try wasmPolishToString(&children[1], source, writer);
             }
             try writer.print(")", .{});
         },
         .Div => {
             try writer.print(" (/", .{});
             if (expr.children) |children| {
-                try wasmPolishToString(&children[0], source, buffer);
-                try wasmPolishToString(&children[1], source, buffer);
+                try wasmPolishToString(&children[0], source, writer);
+                try wasmPolishToString(&children[1], source, writer);
             }
             try writer.print(")", .{});
         },
         .Pow => {
             try writer.print(" (^", .{});
             if (expr.children) |children| {
-                try wasmPolishToString(&children[0], source, buffer);
-                try wasmPolishToString(&children[1], source, buffer);
+                try wasmPolishToString(&children[0], source, writer);
+                try wasmPolishToString(&children[1], source, writer);
             }
             try writer.print(")", .{});
         },
         .Dot => {
             try writer.print(" (.", .{});
             if (expr.children) |children| {
-                try wasmPolishToString(&children[0], source, buffer);
-                try wasmPolishToString(&children[1], source, buffer);
+                try wasmPolishToString(&children[0], source, writer);
+                try wasmPolishToString(&children[1], source, writer);
             }
             try writer.print(")", .{});
         },
         .Assignment => {
             try writer.print(" (=", .{});
             if (expr.children) |children| {
-                try wasmPolishToString(&children[0], source, buffer);
-                try wasmPolishToString(&children[1], source, buffer);
+                try wasmPolishToString(&children[0], source, writer);
+                try wasmPolishToString(&children[1], source, writer);
             }
             try writer.print(")", .{});
         },
         .With => {
             try writer.print(" (with ", .{});
             if (expr.children) |children| {
-                try wasmPolishToString(&children[0], source, buffer);
-                try wasmPolishToString(&children[1], source, buffer);
+                try wasmPolishToString(&children[0], source, writer);
+                try wasmPolishToString(&children[1], source, writer);
             }
             try writer.print(")", .{});
         },
         .UnaryMinus => {
             try writer.print(" (-u", .{});
             if (expr.children) |children| {
-                try wasmPolishToString(&children[0], source, buffer);
+                try wasmPolishToString(&children[0], source, writer);
             }
             try writer.print(")", .{});
         },
         .UnaryPlus => {
             try writer.print(" (+", .{});
             if (expr.children) |children| {
-                try wasmPolishToString(&children[0], source, buffer);
+                try wasmPolishToString(&children[0], source, writer);
             }
             try writer.print(")", .{});
         },
@@ -711,7 +710,7 @@ fn wasmPolishToString(expr: *const Expression, source: []const u8, buffer: *std.
             if (expr.children) |children| {
                 const length = expr.value.?.length;
                 for (0..length) |i| {
-                    try wasmPolishToString(&children[i], source, buffer);
+                    try wasmPolishToString(&children[i], source, writer);
                 }
             }
             try writer.print(")", .{});
@@ -721,7 +720,7 @@ fn wasmPolishToString(expr: *const Expression, source: []const u8, buffer: *std.
             if (expr.children) |children| {
                 const length = expr.value.?.length;
                 for (0..length) |i| {
-                    try wasmPolishToString(&children[i], source, buffer);
+                    try wasmPolishToString(&children[i], source, writer);
                 }
             }
             try writer.print(")", .{});
@@ -731,7 +730,7 @@ fn wasmPolishToString(expr: *const Expression, source: []const u8, buffer: *std.
             if (expr.children) |children| {
                 const length = expr.value.?.length;
                 for (0..length) |i| {
-                    try wasmPolishToString(&children[i], source, buffer);
+                    try wasmPolishToString(&children[i], source, writer);
                 }
             }
             try writer.print(")", .{});
@@ -739,23 +738,23 @@ fn wasmPolishToString(expr: *const Expression, source: []const u8, buffer: *std.
         .Comma => {
             try writer.print(", ", .{});
             if (expr.children) |children| {
-                try wasmPolishToString(&children[0], source, buffer);
-                try wasmPolishToString(&children[1], source, buffer);
+                try wasmPolishToString(&children[0], source, writer);
+                try wasmPolishToString(&children[1], source, writer);
             }
         },
         .FunctionCall => {
             try writer.print(" (call", .{});
             if (expr.children) |children| {
-                try wasmPolishToString(&children[0], source, buffer);
-                try wasmPolishToString(&children[1], source, buffer);
+                try wasmPolishToString(&children[0], source, writer);
+                try wasmPolishToString(&children[1], source, writer);
             }
             try writer.print(")", .{});
         },
         .Juxt => {
             try writer.print(" (juxt", .{});
             if (expr.children) |children| {
-                try wasmPolishToString(&children[0], source, buffer);
-                try wasmPolishToString(&children[1], source, buffer);
+                try wasmPolishToString(&children[0], source, writer);
+                try wasmPolishToString(&children[1], source, writer);
             }
             try writer.print(")", .{});
         },
@@ -766,8 +765,7 @@ fn wasmPolishToString(expr: *const Expression, source: []const u8, buffer: *std.
 }
 
 // JSON tree serialization for WASM
-fn wasmTreeToJson(expr: *const Expression, source: []const u8, buffer: *std.ArrayList(u8)) !void {
-    var writer: std.Io.Writer = .fixed(buffer.items);
+fn wasmTreeToJson(expr: *const Expression, source: []const u8, writer: *std.Io.Writer) !void {
     try writer.print("{{\"type\":\"{s}\"", .{@tagName(expr.type)});
 
     // Add position info
@@ -798,7 +796,7 @@ fn wasmTreeToJson(expr: *const Expression, source: []const u8, buffer: *std.Arra
 
         for (0..length) |i| {
             if (i > 0) try writer.print(",", .{});
-            try wasmTreeToJson(&children[i], source, buffer);
+            try wasmTreeToJson(&children[i], source, writer);
         }
         try writer.print("]", .{});
     }
@@ -811,19 +809,19 @@ export fn parseExpression(input_ptr: [*]const u8, input_len: usize) bool {
     output_len = 0;
 
     // Create a null-terminated string from the input
-    if (input_len >= output_buffer.len - 1) {
+    if (input_len >= output_writer.len - 1) {
         // Input too long, copy error message
         const error_msg = "Error: Input too long";
-        @memcpy(output_buffer[0..error_msg.len], error_msg);
+        @memcpy(output_writer[0..error_msg.len], error_msg);
         output_len = error_msg.len;
         return false;
     }
 
     // Copy input and null-terminate
-    var input_buffer: [2048]u8 = undefined;
-    @memcpy(input_buffer[0..input_len], input_ptr[0..input_len]);
-    input_buffer[input_len] = 0;
-    const expr: [:0]const u8 = input_buffer[0..input_len :0];
+    var input_writer: [2048]u8 = undefined;
+    @memcpy(input_writer[0..input_len], input_ptr[0..input_len]);
+    input_writer[input_len] = 0;
+    const expr: [:0]const u8 = input_writer[0..input_len :0];
 
     // Create arena allocator
     var arena = std.heap.ArenaAllocator.init(std.heap.page_allocator);
@@ -843,20 +841,20 @@ export fn parseExpression(input_ptr: [*]const u8, input_len: usize) bool {
             error.InvalidCharacter => "Error: Invalid character",
             error.WriteFailed => "Error: Write failed",
         };
-        @memcpy(output_buffer[0..error_msg.len], error_msg);
+        @memcpy(output_writer[0..error_msg.len], error_msg);
         output_len = error_msg.len;
         return false;
     };
 
-    // Copy result to output buffer
-    if (result.len >= output_buffer.len) {
+    // Copy result to output writer
+    if (result.len >= output_writer.len) {
         const error_msg = "Error: Result too long";
-        @memcpy(output_buffer[0..error_msg.len], error_msg);
+        @memcpy(output_writer[0..error_msg.len], error_msg);
         output_len = error_msg.len;
         return false;
     }
 
-    @memcpy(output_buffer[0..result.len], result);
+    @memcpy(output_writer[0..result.len], result);
     output_len = result.len;
     return true;
 }
@@ -867,19 +865,19 @@ export fn parseExpressionToTree(input_ptr: [*]const u8, input_len: usize) bool {
     output_len = 0;
 
     // Create a null-terminated string from the input
-    if (input_len >= output_buffer.len - 1) {
+    if (input_len >= output_writer.len - 1) {
         // Input too long, copy error message
         const error_msg = "Error: Input too long";
-        @memcpy(output_buffer[0..error_msg.len], error_msg);
+        @memcpy(output_writer[0..error_msg.len], error_msg);
         output_len = error_msg.len;
         return false;
     }
 
     // Copy input and null-terminate
-    var input_buffer: [2048]u8 = undefined;
-    @memcpy(input_buffer[0..input_len], input_ptr[0..input_len]);
-    input_buffer[input_len] = 0;
-    const expr: [:0]const u8 = input_buffer[0..input_len :0];
+    var input_writer: [2048]u8 = undefined;
+    @memcpy(input_writer[0..input_len], input_ptr[0..input_len]);
+    input_writer[input_len] = 0;
+    const expr: [:0]const u8 = input_writer[0..input_len :0];
 
     // Create arena allocator
     var arena = std.heap.ArenaAllocator.init(std.heap.page_allocator);
@@ -899,20 +897,20 @@ export fn parseExpressionToTree(input_ptr: [*]const u8, input_len: usize) bool {
             error.InvalidCharacter => "Error: Invalid character",
             error.WriteFailed => "Error: Write failed",
         };
-        @memcpy(output_buffer[0..error_msg.len], error_msg);
+        @memcpy(output_writer[0..error_msg.len], error_msg);
         output_len = error_msg.len;
         return false;
     };
 
-    // Copy result to output buffer
-    if (result.len >= output_buffer.len) {
+    // Copy result to output writer
+    if (result.len >= output_writer.len) {
         const error_msg = "Error: Result too long";
-        @memcpy(output_buffer[0..error_msg.len], error_msg);
+        @memcpy(output_writer[0..error_msg.len], error_msg);
         output_len = error_msg.len;
         return false;
     }
 
-    @memcpy(output_buffer[0..result.len], result);
+    @memcpy(output_writer[0..result.len], result);
     output_len = result.len;
     return true;
 }
@@ -933,10 +931,13 @@ fn parseExpressionInternal(expr: [:0]const u8, allocator: std.mem.Allocator) ![]
     var parser = Parser.init(token_stream, expr, allocator);
     const ast = try parser.parse(0);
 
-    var polish_buffer: ArrayList(u8) = try .initCapacity(allocator, 16);
-    try wasmPolishToString(&ast, expr, &polish_buffer);
+    var writer_impl: std.Io.Writer.Allocating = .init(allocator);
+    defer writer_impl.deinit();
+    var writer: std.Io.Writer = writer_impl.writer;
 
-    const result = std.mem.trim(u8, polish_buffer.items, " ");
+    try wasmPolishToString(&ast, expr, &writer);
+
+    const result = std.mem.trim(u8, writer_impl.written(), " ");
 
     const result_copy = try allocator.dupe(u8, result);
     return result_copy;
@@ -958,10 +959,13 @@ fn parseExpressionToTreeInternal(expr: [:0]const u8, allocator: std.mem.Allocato
     var parser = Parser.init(token_stream, expr, allocator);
     const ast = try parser.parse(0);
 
-    var json_buffer: ArrayList(u8) = try .initCapacity(allocator, 1024);
-    try wasmTreeToJson(&ast, expr, &json_buffer);
+    var writer_impl: std.Io.Writer.Allocating = .init(allocator);
+    defer writer_impl.deinit();
+    var json_writer: std.Io.Writer = writer_impl.writer;
 
-    const result = std.mem.trim(u8, json_buffer.items, " ");
+    try wasmTreeToJson(&ast, expr, &json_writer);
+
+    const result = std.mem.trim(u8, writer_impl.written(), " ");
 
     const result_copy = try allocator.dupe(u8, result);
     return result_copy;

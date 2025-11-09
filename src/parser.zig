@@ -98,7 +98,7 @@ pub const _Token = struct { tag: TokenType, pos: Loc };
 pub const TokenStream = ArrayList(_Token);
 
 pub const Tokenizer = struct {
-    buffer: [:0]const u8,
+    writer: [:0]const u8,
     index: usize,
 
     const State = enum {
@@ -120,13 +120,13 @@ pub const Tokenizer = struct {
     };
 
     pub fn dump(self: *Tokenizer, token: *const _Token) void {
-        std.debug.print("{s} \"{s}\"\n", .{ @tagName(token.tag), self.buffer[token.pos.from..(token.pos.to)] });
+        std.debug.print("{s} \"{s}\"\n", .{ @tagName(token.tag), self.writer[token.pos.from..(token.pos.to)] });
     }
 
-    pub fn init(buffer: [:0]const u8) Tokenizer {
-        // print("Initial string, {s}, len: {d}\n", .{buffer, buffer.len});
+    pub fn init(writer: [:0]const u8) Tokenizer {
+        // print("Initial string, {s}, len: {d}\n", .{writer, writer.len});
         return .{
-            .buffer = buffer,
+            .writer = writer,
             .index = 0,
         };
     }
@@ -137,7 +137,7 @@ pub const Tokenizer = struct {
             .to = undefined,
         } };
 
-        if (self.index >= self.buffer.len) {
+        if (self.index >= self.writer.len) {
             // print("Reached end of expression\n", .{});
             return .{
                 .tag = .Eof,
@@ -149,7 +149,7 @@ pub const Tokenizer = struct {
         }
 
         state: switch (State.start) {
-            .start => switch (self.buffer[self.index]) {
+            .start => switch (self.writer[self.index]) {
                 '0'...'9' => {
                     self.index += 1;
                     continue :state .number;
@@ -214,7 +214,7 @@ pub const Tokenizer = struct {
                 },
             },
             .number => {
-                switch (self.buffer[self.index]) {
+                switch (self.writer[self.index]) {
                     '0'...'9' => { // this will consume numbers in "123.23" before the decimal
                         self.index += 1;
                         continue :state .number;
@@ -227,7 +227,7 @@ pub const Tokenizer = struct {
             },
             .decimal_number => {
                 self.index += 1;
-                switch (self.buffer[self.index]) {
+                switch (self.writer[self.index]) {
                     '0'...'9' => { // this will consume numbers after the decimal point
                         // self.index += 1;
                         continue :state .decimal_number;
@@ -238,7 +238,7 @@ pub const Tokenizer = struct {
                 }
             },
             .period => {
-                switch (self.buffer[self.index]) {
+                switch (self.writer[self.index]) {
                     '0'...'9' => continue :state .decimal_number,
                     else => {
                         result.tag = .Op;
@@ -247,7 +247,7 @@ pub const Tokenizer = struct {
             },
             .variable => { // If we're here, then we're past the initial letter in a_{123}
                 self.index += 1;
-                switch (self.buffer[self.index]) {
+                switch (self.writer[self.index]) {
                     '_' => continue :state .variable_subscript,
                     else => {
                         result.tag = .Variable;
@@ -256,7 +256,7 @@ pub const Tokenizer = struct {
             },
             .variable_subscript => {
                 self.index += 1;
-                switch (self.buffer[self.index]) {
+                switch (self.writer[self.index]) {
                     'a'...'z', 'A'...'Z', '0'...'9', '{' => continue :state .variable_subscript,
                     '}' => {
                         self.index += 1;
@@ -268,7 +268,7 @@ pub const Tokenizer = struct {
                 }
             },
             .operator_name => {
-                switch (self.buffer[self.index]) {
+                switch (self.writer[self.index]) {
                     '{' => {
                         self.index += 1;
                         result.pos.from = self.index; // ignore the opening brace
@@ -279,7 +279,7 @@ pub const Tokenizer = struct {
                         continue :state .operator_name;
                     },
                     else => {
-                        const text = self.buffer[result.pos.from..self.index];
+                        const text = self.writer[result.pos.from..self.index];
                         print("Keyword: {s}\n", .{text});
                         if (getKeyword(text)) |tag| {
                             result.tag = tag;
@@ -296,10 +296,10 @@ pub const Tokenizer = struct {
             .latex_command => {
                 self.index += 1;
                 result.tag = .latex_command;
-                switch (self.buffer[self.index]) {
+                switch (self.writer[self.index]) {
                     'a'...'z', 'A'...'Z' => continue :state .latex_command,
                     else => {
-                        const text = self.buffer[result.pos.from..self.index];
+                        const text = self.writer[result.pos.from..self.index];
                         if (getKeyword(text)) |tag| {
                             print("Keyword found: {s} -> {s}\n", .{ text, @tagName(tag) });
                             if (tag == .OperatorName) {
@@ -654,10 +654,11 @@ pub fn main() !void {
     printAST(&ast, 0);
 
     print("AST (Polish):\n", .{});
-    var polish_buffer: std.ArrayList(u8) = try .initCapacity(arena, 16);
-    defer polish_buffer.deinit(arena);
-    try polishToString(&ast, expr, &polish_buffer);
-    print("{s}\n", .{polish_buffer.items});
+
+    var stdout_writer = std.fs.File.stdout().writer(&.{});
+    const stdout = &stdout_writer.interface;
+
+    try polishToString(&ast, expr, stdout);
 }
 
 test "Testing Tokenizer" {
@@ -808,13 +809,13 @@ fn testParser(source: [:0]const u8, expected_polish: []const u8) !void {
     const ast = try parser.parse(0);
 
     // Convert Polish notation to string
-    var polish_buffer = std.ArrayList(u8).init(allocator);
-    defer polish_buffer.deinit();
+    var polish_writer: std.Io.Writer = .allocating(gpa);
+    defer polish_writer.deinit(gpa);
 
-    try polishToString(&ast, source, &polish_buffer);
+    try polishToString(&ast, source, &polish_writer);
 
     // Trim trailing whitespace
-    const actual_polish = std.mem.trim(u8, polish_buffer.items, " ");
+    const actual_polish = std.mem.trim(u8, polish_writer.items, " ");
 
     print("Expected: '{s}'\n", .{expected_polish});
     print("Actual:   '{s}'\n", .{actual_polish});
@@ -825,8 +826,7 @@ fn testParser(source: [:0]const u8, expected_polish: []const u8) !void {
     print("Success: {s}\n", .{source});
 }
 
-pub fn polishToString(expr: *const Expression, source: []const u8, buffer: *std.ArrayList(u8)) !void {
-    var writer: std.Io.Writer = .fixed(buffer.items);
+pub fn polishToString(expr: *const Expression, source: []const u8, writer: *std.Io.Writer) !void {
     switch (expr.type) {
         .Variable => {
             try writer.print(" {s}", .{source[expr.pos.from..expr.pos.to]});
@@ -848,86 +848,86 @@ pub fn polishToString(expr: *const Expression, source: []const u8, buffer: *std.
         .Add => {
             try writer.print(" (+", .{});
             if (expr.children) |children| {
-                try polishToString(&children[0], source, buffer);
-                try polishToString(&children[1], source, buffer);
+                try polishToString(&children[0], source, writer);
+                try polishToString(&children[1], source, writer);
             }
             try writer.print(")", .{});
         },
         .Sub => {
             try writer.print(" (-", .{});
             if (expr.children) |children| {
-                try polishToString(&children[0], source, buffer);
-                try polishToString(&children[1], source, buffer);
+                try polishToString(&children[0], source, writer);
+                try polishToString(&children[1], source, writer);
             }
             try writer.print(")", .{});
         },
         .Mul => {
             try writer.print(" (*", .{});
             if (expr.children) |children| {
-                try polishToString(&children[0], source, buffer);
-                try polishToString(&children[1], source, buffer);
+                try polishToString(&children[0], source, writer);
+                try polishToString(&children[1], source, writer);
             }
             try writer.print(")", .{});
         },
         .iMul => {
             try writer.print(" (*i", .{});
             if (expr.children) |children| {
-                try polishToString(&children[0], source, buffer);
-                try polishToString(&children[1], source, buffer);
+                try polishToString(&children[0], source, writer);
+                try polishToString(&children[1], source, writer);
             }
             try writer.print(")", .{});
         },
         .Div => {
             try writer.print(" (/", .{});
             if (expr.children) |children| {
-                try polishToString(&children[0], source, buffer);
-                try polishToString(&children[1], source, buffer);
+                try polishToString(&children[0], source, writer);
+                try polishToString(&children[1], source, writer);
             }
             try writer.print(")", .{});
         },
         .Pow => {
             try writer.print(" (^", .{});
             if (expr.children) |children| {
-                try polishToString(&children[0], source, buffer);
-                try polishToString(&children[1], source, buffer);
+                try polishToString(&children[0], source, writer);
+                try polishToString(&children[1], source, writer);
             }
             try writer.print(")", .{});
         },
         .Dot => {
             try writer.print(" (.", .{});
             if (expr.children) |children| {
-                try polishToString(&children[0], source, buffer);
-                try polishToString(&children[1], source, buffer);
+                try polishToString(&children[0], source, writer);
+                try polishToString(&children[1], source, writer);
             }
             try writer.print(")", .{});
         },
         .Assignment => {
             try writer.print(" (=", .{});
             if (expr.children) |children| {
-                try polishToString(&children[0], source, buffer);
-                try polishToString(&children[1], source, buffer);
+                try polishToString(&children[0], source, writer);
+                try polishToString(&children[1], source, writer);
             }
             try writer.print(")", .{});
         },
         .With => {
             try writer.print(" (with ", .{});
             if (expr.children) |children| {
-                try polishToString(&children[0], source, buffer);
-                try polishToString(&children[1], source, buffer);
+                try polishToString(&children[0], source, writer);
+                try polishToString(&children[1], source, writer);
             }
             try writer.print(")", .{});
         },
         .UnaryMinus => {
             try writer.print(" (-u", .{});
             if (expr.children) |children| {
-                try polishToString(&children[0], source, buffer);
+                try polishToString(&children[0], source, writer);
             }
             try writer.print(")", .{});
         },
         .UnaryPlus => {
             try writer.print(" (+", .{});
             if (expr.children) |children| {
-                try polishToString(&children[0], source, buffer);
+                try polishToString(&children[0], source, writer);
             }
             try writer.print(")", .{});
         },
@@ -936,7 +936,7 @@ pub fn polishToString(expr: *const Expression, source: []const u8, buffer: *std.
             if (expr.children) |children| {
                 const length = expr.value.?.length;
                 for (0..length) |i| {
-                    try polishToString(&children[i], source, buffer);
+                    try polishToString(&children[i], source, writer);
                 }
             }
             try writer.print(")", .{});
@@ -946,7 +946,7 @@ pub fn polishToString(expr: *const Expression, source: []const u8, buffer: *std.
             if (expr.children) |children| {
                 const length = expr.value.?.length;
                 for (0..length) |i| {
-                    try polishToString(&children[i], source, buffer);
+                    try polishToString(&children[i], source, writer);
                 }
             }
             try writer.print(")", .{});
@@ -956,7 +956,7 @@ pub fn polishToString(expr: *const Expression, source: []const u8, buffer: *std.
             if (expr.children) |children| {
                 const length = expr.value.?.length;
                 for (0..length) |i| {
-                    try polishToString(&children[i], source, buffer);
+                    try polishToString(&children[i], source, writer);
                 }
             }
             try writer.print(")", .{});
@@ -964,23 +964,23 @@ pub fn polishToString(expr: *const Expression, source: []const u8, buffer: *std.
         .Comma => {
             try writer.print(", ", .{});
             if (expr.children) |children| {
-                try polishToString(&children[0], source, buffer);
-                try polishToString(&children[1], source, buffer);
+                try polishToString(&children[0], source, writer);
+                try polishToString(&children[1], source, writer);
             }
         },
         .FunctionCall => {
             try writer.print(" (call", .{});
             if (expr.children) |children| {
-                try polishToString(&children[0], source, buffer);
-                try polishToString(&children[1], source, buffer);
+                try polishToString(&children[0], source, writer);
+                try polishToString(&children[1], source, writer);
             }
             try writer.print(")", .{});
         },
         .Juxt => {
             try writer.print(" (juxt", .{});
             if (expr.children) |children| {
-                try polishToString(&children[0], source, buffer);
-                try polishToString(&children[1], source, buffer);
+                try polishToString(&children[0], source, writer);
+                try polishToString(&children[1], source, writer);
             }
             try writer.print(")", .{});
         },
