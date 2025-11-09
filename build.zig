@@ -4,23 +4,30 @@ pub fn build(b: *std.Build) !void {
     const target = b.standardTargetOptions(.{});
     const optimize = b.standardOptimizeOption(.{});
 
-    const parser_mod = b.addModule("tex", .{
-        .root_source_file = b.path("src/parser.zig"),
+    const tex_mod = b.addModule("tex", .{
+        .root_source_file = b.path("src/root.zig"),
         .target = target,
         .optimize = optimize,
     });
 
     const tex_lib = b.addLibrary(.{
         .name = "tex",
-        .root_module = parser_mod,
+        .root_module = tex_mod,
         .linkage = .static,
     });
     b.installArtifact(tex_lib);
 
+    const exe_mod = b.createModule(.{
+        .root_source_file = b.path("src/main.zig"),
+        .target = target,
+        .optimize = optimize,
+    });
+    exe_mod.addImport("tex", tex_mod);
+
     // Create the executable
     const exe = b.addExecutable(.{
         .name = "parser",
-        .root_module = parser_mod,
+        .root_module = exe_mod,
     });
 
     b.installArtifact(exe);

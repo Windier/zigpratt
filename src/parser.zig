@@ -1,336 +1,10 @@
 const std = @import("std");
 const print = std.debug.print;
 const expect = std.testing.expect;
-const gpa = std.heap.smp_allocator;
 const ArrayList = std.ArrayList;
+const alloc = std.heap.smp_allocator;
 
-const arg_parse = @import("arg_parse.zig");
-
-// a + b -- Add(a,b)
-// f = (x) -> x + 1 -- Assignment of lambda function
-// f(x) = x + 1 -- FunctionCall
-// abc.sin -- lhs / dot / rhs
-// a.x -- DotAccess
-// (x) + 1
-// (x) => x - 1
-// [a, b, c].join()
-// [a, b, c] = f()
-
-// fn dfdx(k: usize, x: *f32) void {
-//     x.* += @floatFromInt(k);
-// }
-
-// Lexer Tokens
-const TokenType = enum {
-    Variable,
-    Constant,
-    Number,
-    Integer,
-    Real,
-    ImaginaryUnit,
-    Plus,
-    Minus,
-    Caret,
-    Asterisk,
-    Identifier,
-    BinaryOp,
-    Op,
-    latex_command,
-    Slash,
-    LParen,
-    RParen,
-    LBrak,
-    RBrak,
-    LBrace,
-    RBrace,
-    With,
-    For,
-    OperatorName,
-    Color,
-    Left,
-    Right,
-    VBar,
-    LVBar,
-    RVBar,
-    Comma,
-    Invalid,
-    FunctionName,
-    Fraction,
-    Eof,
-};
-// \frac{}{}
-pub const keywords = std.StaticStringMap(TokenType).initComptime(.{
-    .{ "left(", .LParen },
-    .{ "right)", .RParen },
-    .{ "left[", .LBrak },
-    .{ "right]", .RBrak },
-    .{ "left{", .LBrace },
-    .{ "right}", .RBrace },
-    .{ "left|", .LVBar },
-    .{ "right|", .RVBar },
-    .{ "left", .Left }, // latex: \left
-    .{ "right", .Right }, // latex: \right
-    .{ "{", .LBrace }, // latex: \{
-    .{ "}", .RBrace }, // latex : \}
-    .{ "frac", .Fraction },
-    .{ "operatorname", .OperatorName }, // LaTeX: \operatorname{with}
-    .{ "with", .With }, // LaTeX: \operatorname{with}
-    .{ "for", .For }, // LaTeX: \operatorname{for}
-    .{ "rgb", .Color }, // LaTeX: \operatorname{rgb}
-
-    .{ "sin", .FunctionName },
-    .{ "cos", .FunctionName },
-    .{ "tan", .FunctionName },
-
-    .{ "theta", .Variable },
-    .{ "alpha", .Variable },
-    .{ "gamma", .Variable },
-    .{ "pi", .Constant },
-});
-
-const Token = struct { type: TokenType, text: ?u8 = null, value: ?i64 = null };
-
-pub fn getKeyword(text: []const u8) ?TokenType {
-    return keywords.get(text);
-}
-
-const Loc = struct { from: usize, to: usize };
-pub const _Token = struct { tag: TokenType, pos: Loc };
-
-pub const TokenStream = ArrayList(_Token);
-
-pub const Tokenizer = struct {
-    buffer: [:0]const u8,
-    index: usize,
-
-    const State = enum {
-        start,
-        identifier,
-        variable,
-        variable_subscript,
-        latex_command,
-        operator_name,
-        builtin,
-        plus,
-        minus,
-        int,
-        period,
-        number, // integer
-        decimal_number, // float
-        invalid,
-        unknown,
-    };
-
-    pub fn dump(self: *Tokenizer, token: *const _Token) void {
-        std.debug.print("{s} \"{s}\"\n", .{ @tagName(token.tag), self.buffer[token.pos.from..(token.pos.to)] });
-    }
-
-    pub fn init(buf: [:0]const u8) Tokenizer {
-        // print("Initial string, {s}, len: {d}\n", .{writer, writer.len});
-        return .{
-            .buffer = buf,
-            .index = 0,
-        };
-    }
-
-    pub fn next(self: *Tokenizer) ?_Token {
-        var result: _Token = .{ .tag = undefined, .pos = .{
-            .from = self.index,
-            .to = undefined,
-        } };
-
-        if (self.index >= self.buffer.len) {
-            // print("Reached end of Expression\n", .{});
-            return .{
-                .tag = .Eof,
-                .pos = .{
-                    .from = self.index,
-                    .to = self.index,
-                },
-            };
-        }
-
-        state: switch (State.start) {
-            .start => switch (self.buffer[self.index]) {
-                '0'...'9' => {
-                    self.index += 1;
-                    continue :state .number;
-                },
-                '.' => {
-                    self.index += 1;
-                    continue :state .period;
-                },
-                '\\' => {
-                    self.index += 1;
-                    result.pos.from = self.index; // ignore the backslash
-                    continue :state .latex_command;
-                },
-                'a'...'z', 'A'...'Z' => {
-                    result.tag = .Variable;
-                    continue :state .variable;
-                },
-                '+', '-', '*', '/', '^', '=' => {
-                    result.tag = .Op;
-                    self.index += 1;
-                },
-                ',' => {
-                    result.tag = .Comma;
-                    self.index += 1;
-                },
-                '(' => {
-                    result.tag = .LParen;
-                    self.index += 1;
-                },
-                ')' => {
-                    result.tag = .RParen;
-                    self.index += 1;
-                },
-                '[' => {
-                    result.tag = .LBrak;
-                    self.index += 1;
-                },
-                ']' => {
-                    result.tag = .RBrak;
-                    self.index += 1;
-                },
-                '{' => {
-                    result.tag = .LBrace;
-                    self.index += 1;
-                },
-                '}' => {
-                    result.tag = .RBrace;
-                    self.index += 1;
-                },
-                '|' => {
-                    result.tag = .VBar;
-                    self.index += 1;
-                },
-                ' ' => {
-                    self.index += 1; // skip whitespace
-                    result.pos.from = self.index;
-                    continue :state .start;
-                },
-                else => {
-                    result.tag = .Invalid;
-                    self.index += 1;
-                },
-            },
-            .number => {
-                switch (self.buffer[self.index]) {
-                    '0'...'9' => { // this will consume numbers in "123.23" before the decimal
-                        self.index += 1;
-                        continue :state .number;
-                    },
-                    '.' => continue :state .decimal_number,
-                    else => {
-                        result.tag = .Integer;
-                    },
-                }
-            },
-            .decimal_number => {
-                self.index += 1;
-                switch (self.buffer[self.index]) {
-                    '0'...'9' => { // this will consume numbers after the decimal point
-                        // self.index += 1;
-                        continue :state .decimal_number;
-                    },
-                    else => {
-                        result.tag = .Real;
-                    },
-                }
-            },
-            .period => {
-                switch (self.buffer[self.index]) {
-                    '0'...'9' => continue :state .decimal_number,
-                    else => {
-                        result.tag = .Op;
-                    },
-                }
-            },
-            .variable => { // If we're here, then we're past the initial letter in a_{123}
-                self.index += 1;
-                switch (self.buffer[self.index]) {
-                    '_' => continue :state .variable_subscript,
-                    else => {
-                        result.tag = .Variable;
-                    },
-                }
-            },
-            .variable_subscript => {
-                self.index += 1;
-                switch (self.buffer[self.index]) {
-                    'a'...'z', 'A'...'Z', '0'...'9', '{' => continue :state .variable_subscript,
-                    '}' => {
-                        self.index += 1;
-                        result.tag = .Variable;
-                    },
-                    else => {
-                        result.tag = .Variable;
-                    },
-                }
-            },
-            .operator_name => {
-                switch (self.buffer[self.index]) {
-                    '{' => {
-                        self.index += 1;
-                        result.pos.from = self.index; // ignore the opening brace
-                        continue :state .operator_name;
-                    },
-                    'a'...'z', 'A'...'Z' => {
-                        self.index += 1;
-                        continue :state .operator_name;
-                    },
-                    else => {
-                        const text = self.buffer[result.pos.from..self.index];
-                        print("Keyword: {s}\n", .{text});
-                        if (getKeyword(text)) |tag| {
-                            result.tag = tag;
-                            result.pos.to = self.index;
-                            self.index += 1;
-                            return result;
-                        }
-                        result.tag = .Invalid;
-                        result.pos.to = self.index;
-                        return result;
-                    },
-                }
-            },
-            .latex_command => {
-                self.index += 1;
-                result.tag = .latex_command;
-                switch (self.buffer[self.index]) {
-                    'a'...'z', 'A'...'Z' => continue :state .latex_command,
-                    else => {
-                        const text = self.buffer[result.pos.from..self.index];
-                        if (getKeyword(text)) |tag| {
-                            print("Keyword found: {s} -> {s}\n", .{ text, @tagName(tag) });
-                            if (tag == .OperatorName) {
-                                result.pos.from = self.index;
-                                continue :state .operator_name;
-                            }
-
-                            result.tag = tag;
-                            result.pos.to = self.index;
-                            return result;
-                        }
-                        result.tag = .Invalid;
-                        result.pos.to = self.index;
-                        return result;
-                    },
-                }
-            },
-            .invalid => {
-                result.tag = .Invalid;
-            },
-            else => {
-                result.tag = .Invalid;
-            },
-        }
-
-        result.pos.to = self.index;
-        return result;
-    }
-};
+const tok = @import("tokenizer.zig");
 
 const input = enum { Op, Atom, Invalid };
 
@@ -376,7 +50,7 @@ pub const prefix_operators = std.StaticStringMap(ExprType).initComptime(.{
     .{ "-", .UnaryMinus },
 });
 
-pub fn get_infix_operator(text: []const u8, tag: TokenType) ?ExprType {
+pub fn get_infix_operator(text: []const u8, tag: tok.TokenType) ?ExprType {
     switch (tag) {
         .Variable => {
             return .iMul;
@@ -397,7 +71,7 @@ pub fn get_prefix_operator(text: []const u8) ?ExprType {
 pub const Expression = struct {
     type: ExprType,
     value: ?union(enum) { i: i64, f: f64, length: u64 },
-    pos: Loc,
+    pos: tok.Loc,
     children: ?[*]Expression, // Might be null for literals
 };
 
@@ -426,13 +100,13 @@ fn prefix_binding_power(op: ?ExprType) error{InvalidOperator}!i8 {
 }
 
 pub const Parser = struct {
-    token_stream: TokenStream,
+    token_stream: tok.TokenStream,
     input: [:0]const u8,
     head: usize = 0,
-    current: _Token,
+    current: tok._Token,
     allocator: std.mem.Allocator,
 
-    pub fn init(token_stream: TokenStream, expr: [:0]const u8, allocator: std.mem.Allocator) Parser {
+    pub fn init(token_stream: tok.TokenStream, expr: [:0]const u8, allocator: std.mem.Allocator) Parser {
         return .{ .token_stream = token_stream, .input = expr, .head = 0, .current = .{ .tag = .Eof, .pos = .{ .from = 0, .to = 0 } }, .allocator = allocator };
     }
 
@@ -446,7 +120,7 @@ pub const Parser = struct {
         self.head += 1;
     }
 
-    pub fn peek(self: *Parser) _Token {
+    pub fn peek(self: *Parser) tok._Token {
         if (self.head >= self.token_stream.items.len) {
             return .{ .tag = .Eof, .pos = .{ .from = 0, .to = 0 } };
         }
@@ -454,7 +128,7 @@ pub const Parser = struct {
         return self.token_stream.items[self.head];
     }
 
-    pub fn expect(self: *Parser, tag: TokenType, err: ParserError) ParserError!void {
+    pub fn expect(self: *Parser, tag: tok.TokenType, err: ParserError) ParserError!void {
         // This function consumes the current token and checks if it matches the expected tag.
         // Throws ParserError if the tag does not match.
         self.consume();
@@ -624,228 +298,77 @@ pub const Parser = struct {
     }
 };
 
-pub fn main() !void {
-    // Initialize the parsing rules
-
-    var token_stream: TokenStream = .empty;
-    defer token_stream.deinit(gpa);
-
-    var arena_impl: std.heap.ArenaAllocator = .init(gpa);
-    defer arena_impl.deinit();
-    const arena = arena_impl.allocator();
-
-    const args = try std.process.argsAlloc(gpa);
-    defer std.process.argsFree(gpa, args);
-
-    const arg_parser = arg_parse.ArgParser.parse(args[1..]);
-
-    std.debug.print("Output Format: {s}\n", .{@tagName(arg_parser.output_format)});
-
-    var ip_buffer: [4096]u8 = undefined;
-    var expr: [:0]u8 = undefined;
-    if (arg_parser.input_file_path) |input_file_path| {
-        const file = try std.fs.cwd().openFile(input_file_path, .{});
-        defer file.close();
-        var fr = file.reader(&ip_buffer);
-        var aw: std.Io.Writer.Allocating = .init(gpa);
-        _ = try fr.interface.streamRemaining(&aw.writer);
-        expr = try aw.toOwnedSliceSentinel(0);
-    } else {
-        var fr = std.fs.File.stdin().reader(&.{});
-        var aw: std.Io.Writer.Allocating = .init(gpa);
-        _ = try fr.interface.streamRemaining(&aw.writer);
-        expr = try aw.toOwnedSliceSentinel(0);
-    }
-    defer gpa.free(expr);
-
-    var tokenizer = Tokenizer.init(expr);
-
-    while (tokenizer.next()) |token| {
-        if (token.tag == .Eof) {
-            print("--eof--\n", .{});
-            break;
-        }
-        try token_stream.append(gpa, token);
-        tokenizer.dump(&token);
-    }
-
-    var parser = Parser.init(token_stream, expr, arena);
-    print("Token stream length: {d}\n", .{token_stream.items.len});
-    const ast = try parser.parse(0);
-    print("input: {}\n", .{ast});
-
-    print("AST (Tree):\n", .{});
-    printAST(&ast, 0);
-
-    print("AST (Polish):\n", .{});
-
-    var op_buffer: [4096]u8 = undefined;
-    if (arg_parser.output_file_path) |output_file_path| {
-        var file = try std.fs.cwd().createFile(output_file_path, .{});
-        defer file.close();
-        const writer_impl = file.writer(&op_buffer);
-        var writer = writer_impl.interface;
-
-        try polishToString(&ast, expr, &writer);
-        try writer.flush();
-    } else {
-        const stdout_writer = std.fs.File.stdout().writer(&op_buffer);
-        var stdout = stdout_writer.interface;
-
-        try polishToString(&ast, expr, &stdout);
-        try stdout.flush();
-    }
-}
-
-test "Testing Tokenizer" {
-    try testTokenize("3", &.{.Integer});
-    try testTokenize(".32342", &.{.Real});
-    try testTokenize("a_{1}", &.{.Variable});
-    try testTokenize("\\sin", &.{.FunctionName});
-    try testTokenize("sin", &.{ .Variable, .Variable, .Variable });
-    try testTokenize("a_{1}+\\sin*3", &.{ .Variable, .Op, .FunctionName, .Op, .Integer });
-    try testTokenize("\\sin", &.{.FunctionName});
-    try testTokenize("\\cos", &.{.FunctionName});
-    try testTokenize("abc_{123}", &.{ .Variable, .Variable, .Variable });
-    try testTokenize("a_{1}+\\sin*3.25-2.2.3.3", &.{ .Variable, .Op, .FunctionName, .Op, .Real, .Op, .Real, .Real, .Real });
-    try testTokenize("a_{abc}", &.{.Variable});
-    try testTokenize("\\frac{a_{1}}{2}", &.{ .Fraction, .LBrace, .Variable, .RBrace, .LBrace, .Integer, .RBrace });
-    try testTokenize("\\left\\{1,2,3\\right\\}", &.{ .Left, .LBrace, .Integer, .Comma, .Integer, .Comma, .Integer, .Right, .RBrace });
-}
-
-test "Integer tokenization" {
-    try testTokenize("3", &.{.Integer});
-}
-
-test "Real number tokenization" {
-    try testTokenize(".32342", &.{.Real});
-}
-
-test "Variable with subscript" {
-    try testTokenize("a_{1}", &.{.Variable});
-}
-
-test "LaTeX function name" {
-    try testTokenize("\\sin", &.{.FunctionName});
-    try testTokenize("\\cos", &.{.FunctionName});
-}
-
-test "Regular variable tokenization" {
-    try testTokenize("sin", &.{ .Variable, .Variable, .Variable });
-}
-
-test "Complex Expression with variables and functions" {
-    try testTokenize("a_{1}+\\sin*3", &.{ .Variable, .Op, .FunctionName, .Op, .Integer });
-}
-
-test "Multiple character variables" {
-    try testTokenize("abc_{123}", &.{ .Variable, .Variable, .Variable });
-}
-
-test "Complex mathematical Expression" {
-    try testTokenize("a_{1}+\\sin*3.25-2.2.3.3", &.{ .Variable, .Op, .FunctionName, .Op, .Real, .Op, .Real, .Real, .Real });
-}
-
-test "Variable with text subscript" {
-    try testTokenize("a_{abc}", &.{.Variable});
-}
-
-test "LaTeX fraction command" {
-    try testTokenize("\\frac{a_{1}}{2}", &.{ .Fraction, .LBrace, .Variable, .RBrace, .LBrace, .Integer, .RBrace });
-}
-
-test "LaTeX left-right delimiters" {
-    try testTokenize("\\left\\{1,2,3\\right\\}", &.{ .Left, .LBrace, .Integer, .Comma, .Integer, .Comma, .Integer, .Right, .RBrace });
-}
-
 test "Parser Polish notation" {
-    try testParser("a+b", "(+ a b)");
-    try testParser("a*b+c", "(+ (* a b) c)");
-    try testParser("a+b*c", "(+ a (* b c))");
-    try testParser("2^3", "(^ 2 3)");
-    try testParser("-a", "(-u a)");
+    try testParser(alloc, "a+b", "(+ a b)");
+    try testParser(alloc, "a*b+c", "(+ (* a b) c)");
+    try testParser(alloc, "a+b*c", "(+ a (* b c))");
+    try testParser(alloc, "2^3", "(^ 2 3)");
+    try testParser(alloc, "-a", "(-u a)");
 }
 
 test "Parser Advanced Polish notation" {
-    try testParser("-x^2-y^2", "(- (-u (^ x 2)) (^ y 2))");
-    try testParser("-a-b-c-d", "(- (- (- (-u a) b) c) d)");
-    try testParser("abc", "(*i (*i a b) c)");
-    try testParser("\\sin abc", "(call func (args (*i a b)))");
+    try testParser(alloc, "-x^2-y^2", "(- (-u (^ x 2)) (^ y 2))");
+    try testParser(alloc, "-a-b-c-d", "(- (- (- (-u a) b) c) d)");
+    try testParser(alloc, "abc", "(*i (*i a b) c)");
+    try testParser(alloc, "\\sin abc", "(call func (args (*i a b)))");
 }
 
 test "Parser Complex Expressions" {
     // Test individual parts first
-    try testParser("xyz", "(*i (*i x y) z)");
-    try testParser("xyz^2", "(*i (*i x y) (^ z 2))");
-    try testParser("-xyz^2", "(*i (*i (-u x) y) (^ z 2))"); // Unary minus binds to first variable
+    try testParser(alloc, "xyz", "(*i (*i x y) z)");
+    try testParser(alloc, "xyz^2", "(*i (*i x y) (^ z 2))");
+    try testParser(alloc, "-xyz^2", "(*i (*i (-u x) y) (^ z 2))"); // Unary minus binds to first variable
 
     // Test abc^2 part
-    try testParser("abc^2", "(*i (*i a b) (^ c 2))");
+    try testParser(alloc, "abc^2", "(*i (*i a b) (^ c 2))");
 
     // Full complex Expression: -xyz^{2}-abc^{2}
-    try testParser("-xyz^2-abc^2", "(- (*i (*i (-u x) y) (^ z 2)) (*i (*i a b) (^ c 2)))");
+    try testParser(alloc, "-xyz^2-abc^2", "(- (*i (*i (-u x) y) (^ z 2)) (*i (*i a b) (^ c 2)))");
 }
 
 test "Parser Edge cases" {
     // Operator precedence tests
-    try testParser("a+b*c^d", "(+ a (* b (^ c d)))");
-    try testParser("a^b+c*d", "(+ (^ a b) (* c d))");
-    try testParser("a*b^c+d", "(+ (* a (^ b c)) d)");
+    try testParser(alloc, "a+b*c^d", "(+ a (* b (^ c d)))");
+    try testParser(alloc, "a^b+c*d", "(+ (^ a b) (* c d))");
+    try testParser(alloc, "a*b^c+d", "(+ (* a (^ b c)) d)");
 
     // Multiple unary operators
-    try testParser("--a", "(-u (-u a))");
-    try testParser("-a+b", "(+ (-u a) b)");
-    try testParser("a+-b", "(+ a (-u b))");
+    try testParser(alloc, "--a", "(-u (-u a))");
+    try testParser(alloc, "-a+b", "(+ (-u a) b)");
+    try testParser(alloc, "a+-b", "(+ a (-u b))");
 
     // Mixed implicit and explicit multiplication
-    try testParser("2x", "(*i 2 x)"); // Number followed by variable works
-    try testParser("2*x", "(* 2 x)"); // Explicit multiplication
+    try testParser(alloc, "2x", "(*i 2 x)"); // Number followed by variable works
+    try testParser(alloc, "2*x", "(* 2 x)"); // Explicit multiplication
 }
 
-fn testTokenize(source: [:0]const u8, expected_token_tags: []const TokenType) !void {
-    var tokenizer = Tokenizer.init(source);
-    for (expected_token_tags) |expected_token_tag| {
-        const token = tokenizer.next().?; // Unwrap the optional
-        tokenizer.dump(&token);
-        try std.testing.expectEqual(expected_token_tag, token.tag);
-    }
-
-    const last_token = tokenizer.next().?; // Unwrap the optional
-    try std.testing.expectEqual(TokenType.Eof, last_token.tag);
-    try std.testing.expectEqual(source.len, last_token.pos.from);
-    try std.testing.expectEqual(source.len, last_token.pos.to);
-
-    // Print success
-    print("Success: {s}\n", .{source});
-}
-
-fn printAST(expr: *const Expression, _: u32) void {
+pub fn printAST(expr: *const Expression, _: u32) void {
     printASTHelper(expr, "", true);
 }
 
-fn testParser(source: [:0]const u8, expected_polish: []const u8) !void {
-    var token_stream: TokenStream = .empty;
+fn testParser(gpa: std.mem.Allocator, source: [:0]const u8, expected_polish: []const u8) !void {
+    var token_stream: tok.TokenStream = .empty;
     defer token_stream.deinit(gpa);
 
-    var arena = std.heap.ArenaAllocator.init(std.heap.page_allocator);
-    defer arena.deinit();
-    const allocator = arena.allocator();
+    var arena_impl = std.heap.ArenaAllocator.init(gpa);
+    defer arena_impl.deinit();
+    const arena = arena_impl.allocator();
 
-    var tokenizer = Tokenizer.init(source);
+    var tokenizer = tok.Tokenizer.init(source);
 
     while (tokenizer.next()) |token| {
         if (token.tag == .Eof) {
             break;
         }
-        try token_stream.append(gpa, token);
+        try token_stream.append(arena, token);
         tokenizer.dump(&token);
     }
 
-    var parser = Parser.init(token_stream, source, allocator);
+    var parser = Parser.init(token_stream, source, arena);
     const ast = try parser.parse(0);
 
     // Convert Polish notation to string
-    var polish_writer: std.Io.Writer.Allocating = .init(gpa);
+    var polish_writer: std.Io.Writer.Allocating = .init(arena);
     defer polish_writer.deinit();
     var writer = polish_writer.writer;
 
