@@ -15,8 +15,9 @@ zig test src/parser.zig
 ### Build WASM and run web interface
 ```bash
 zig build wasm
-cp zig-out/bin/parser.wasm .
-python3 -m http.server 8081
+cd assets
+cp ../zig-out/bin/parser.wasm .
+
 ```
 Then open `http://localhost:8081`
 
