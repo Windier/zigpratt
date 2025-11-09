@@ -25,12 +25,12 @@ pub fn file(path: []const u8, err: anyerror) noreturn {
 
 pub fn help() noreturn {
     std.debug.print(
-        \\Usage: zemml [OPTIONS]
+        \\Usage: zig-tex [OPTIONS]
         \\
         \\ Options:
         \\  --input, -i       Input file path (default: stdin)
         \\  --output, -o      Output file path (default: stdout)
-        \\  --format, -f      Output format [ast|mathml] (default: mathml)
+        \\  --format, -f      Output format [ast] (default: ast)
         \\  --help, -h        Print this help message
         \\
     , .{});

@@ -26,7 +26,7 @@ pub fn build(b: *std.Build) !void {
 
     // Create the executable
     const exe = b.addExecutable(.{
-        .name = "parser",
+        .name = "zig-tex",
         .root_module = exe_mod,
     });
 
