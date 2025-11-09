@@ -916,7 +916,7 @@ export fn parseExpressionToTree(input_ptr: [*]const u8, input_len: usize) bool {
 }
 
 fn parseExpressionInternal(expr: [:0]const u8, allocator: std.mem.Allocator) ![]const u8 {
-    var token_stream: TokenStream = try .initCapacity(allocator, 128);
+    var token_stream: TokenStream = .empty;
     defer token_stream.deinit(allocator);
 
     var tokenizer = Tokenizer.init(expr);
@@ -944,7 +944,7 @@ fn parseExpressionInternal(expr: [:0]const u8, allocator: std.mem.Allocator) ![]
 }
 
 fn parseExpressionToTreeInternal(expr: [:0]const u8, allocator: std.mem.Allocator) ![]const u8 {
-    var token_stream: TokenStream = try .initCapacity(allocator, 128);
+    var token_stream: TokenStream = .empty;
     defer token_stream.deinit(allocator);
 
     var tokenizer = Tokenizer.init(expr);

@@ -1,7 +1,7 @@
 const std = @import("std");
 const print = std.debug.print;
 const expect = std.testing.expect;
-const gpa = std.heap.page_allocator;
+const gpa = std.heap.smp_allocator;
 const ArrayList = std.ArrayList;
 
 const arg_parse = @import("arg_parse.zig");
@@ -100,7 +100,7 @@ pub const _Token = struct { tag: TokenType, pos: Loc };
 pub const TokenStream = ArrayList(_Token);
 
 pub const Tokenizer = struct {
-    buffer: []u8,
+    buffer: [:0]const u8,
     index: usize,
 
     const State = enum {
@@ -125,7 +125,7 @@ pub const Tokenizer = struct {
         std.debug.print("{s} \"{s}\"\n", .{ @tagName(token.tag), self.buffer[token.pos.from..(token.pos.to)] });
     }
 
-    pub fn init(buf: []u8) Tokenizer {
+    pub fn init(buf: [:0]const u8) Tokenizer {
         // print("Initial string, {s}, len: {d}\n", .{writer, writer.len});
         return .{
             .buffer = buf,
@@ -140,7 +140,7 @@ pub const Tokenizer = struct {
         } };
 
         if (self.index >= self.buffer.len) {
-            // print("Reached end of inputession\n", .{});
+            // print("Reached end of Expression\n", .{});
             return .{
                 .tag = .Eof,
                 .pos = .{
@@ -336,7 +336,7 @@ const input = enum { Op, Atom, Invalid };
 
 const Tag = enum { Number, Variable, BinaryOperation };
 
-const inputType = enum {
+const ExprType = enum {
     Add,
     Sub,
     Mul,
@@ -360,7 +360,7 @@ const inputType = enum {
     Invalid,
 };
 
-pub const infix_operators = std.StaticStringMap(inputType).initComptime(.{
+pub const infix_operators = std.StaticStringMap(ExprType).initComptime(.{
     .{ "+", .Add },
     .{ "-", .Sub },
     .{ "*", .Mul },
@@ -371,12 +371,12 @@ pub const infix_operators = std.StaticStringMap(inputType).initComptime(.{
     .{ "with", .With },
 });
 
-pub const prefix_operators = std.StaticStringMap(inputType).initComptime(.{
+pub const prefix_operators = std.StaticStringMap(ExprType).initComptime(.{
     .{ "+", .UnaryPlus },
     .{ "-", .UnaryMinus },
 });
 
-pub fn get_infix_operator(text: []const u8, tag: TokenType) ?inputType {
+pub fn get_infix_operator(text: []const u8, tag: TokenType) ?ExprType {
     switch (tag) {
         .Variable => {
             return .iMul;
@@ -390,18 +390,18 @@ pub fn get_infix_operator(text: []const u8, tag: TokenType) ?inputType {
     return infix_operators.get(text);
 }
 
-pub fn get_prefix_operator(text: []const u8) ?inputType {
+pub fn get_prefix_operator(text: []const u8) ?ExprType {
     return prefix_operators.get(text);
 }
 
-pub const inputession = struct {
-    type: inputType,
+pub const Expression = struct {
+    type: ExprType,
     value: ?union(enum) { i: i64, f: f64, length: u64 },
     pos: Loc,
-    children: ?[*]inputession, // Might be null for literals
+    children: ?[*]Expression, // Might be null for literals
 };
 
-fn infix_binding_power(op: ?inputType) error{InvalidOperator}!struct { i8, i8 } {
+fn infix_binding_power(op: ?ExprType) error{InvalidOperator}!struct { i8, i8 } {
     if (op == null) return error.InvalidOperator;
     switch (op.?) {
         .Comma => return .{ -1, -1 },
@@ -417,7 +417,7 @@ fn infix_binding_power(op: ?inputType) error{InvalidOperator}!struct { i8, i8 } 
     }
 }
 
-fn prefix_binding_power(op: ?inputType) error{InvalidOperator}!i8 {
+fn prefix_binding_power(op: ?ExprType) error{InvalidOperator}!i8 {
     if (op == null) return error.InvalidOperator;
     switch (op.?) {
         .UnaryMinus, .UnaryPlus => return 6,
@@ -474,27 +474,27 @@ pub const Parser = struct {
         InvalidCharacter,
     };
 
-    pub fn parse_prefix(self: *Parser) ParserError!inputession {
+    pub fn parse_prefix(self: *Parser) ParserError!Expression {
         const op = self.current;
         if (op.tag != .Op) return ParserError.UnexpectedToken;
 
         const op_text: []const u8 = self.input[op.pos.from..op.pos.to];
-        const op_type: ?inputType = get_prefix_operator(op_text);
+        const op_type: ?ExprType = get_prefix_operator(op_text);
         if (op_type == null) return ParserError.InvalidOperator;
 
         const r_bp = try prefix_binding_power(op_type);
         const expr = try self.parse(r_bp);
 
-        const children = try self.allocator.alloc(inputession, 1); // Allocate memory for the children array
+        const children = try self.allocator.alloc(Expression, 1); // Allocate memory for the children array
         children[0] = expr;
 
-        return inputession{ .type = op_type.?, .value = null, .pos = op.pos, .children = children.ptr };
+        return Expression{ .type = op_type.?, .value = null, .pos = op.pos, .children = children.ptr };
     }
 
-    pub fn parse_paren(self: *Parser) ParserError!inputession {
+    pub fn parse_paren(self: *Parser) ParserError!Expression {
 
         // print("Entering paren\n", .{});
-        // Paren can be for grouping (has .Comma) or simply to wrap an inputession
+        // Paren can be for grouping (has .Comma) or simply to wrap an Expression
         // Lookahead for commas
         var level: i32 = 0;
         var commas: u32 = 0;
@@ -516,25 +516,25 @@ pub const Parser = struct {
 
         if (level != 0) return ParserError.UnmatchedParentheses;
         if (commas == 0) {
-            var children = try self.allocator.alloc(inputession, 1);
+            var children = try self.allocator.alloc(Expression, 1);
             children[0] = try self.parse(0);
-            return inputession{ .type = .Paren, .value = .{ .length = 1 }, .pos = self.current.pos, .children = children.ptr };
-        } // If there are no commas, it's a parenthesized inputession
+            return Expression{ .type = .Paren, .value = .{ .length = 1 }, .pos = self.current.pos, .children = children.ptr };
+        } // If there are no commas, it's a parenthesized Expression
 
         const len = commas + 1;
-        var children = try self.allocator.alloc(inputession, len);
+        var children = try self.allocator.alloc(Expression, len);
         for (0..len) |i| {
             children[i] = try self.parse(0);
-            if (i < len - 1) try self.expect(.Comma, ParserError.UnmatchedParentheses); // Comma is expected between inputessions
+            if (i < len - 1) try self.expect(.Comma, ParserError.UnmatchedParentheses); // Comma is expected between Expressions
         }
 
-        return inputession{ .type = .Object, .value = .{ .length = len }, .pos = self.current.pos, .children = children.ptr };
+        return Expression{ .type = .Object, .value = .{ .length = len }, .pos = self.current.pos, .children = children.ptr };
     }
 
-    pub fn parse_func(self: *Parser) ParserError!inputession {
+    pub fn parse_func(self: *Parser) ParserError!Expression {
 
         // Final type can be FunctionCall for f(x,y) or Juxt for \\sin x
-        var final_type: inputType = undefined;
+        var final_type: ExprType = undefined;
 
         switch (self.peek().tag) {
             .LParen => {
@@ -548,35 +548,35 @@ pub const Parser = struct {
             }, // \\sin abc
         }
 
-        const name = inputession{ .type = .FunctionName, .value = null, .pos = self.current.pos, .children = null };
+        const name = Expression{ .type = .FunctionName, .value = null, .pos = self.current.pos, .children = null };
         var args = try self.parse(0); // Will return an .Object
         args.type = .Arguments;
         args.value = .{ .length = 1 };
 
-        var children = try self.allocator.alloc(inputession, 2);
+        var children = try self.allocator.alloc(Expression, 2);
         children[0] = name;
         children[1] = args;
 
-        const func = inputession{ .type = .FunctionCall, .value = null, .pos = self.current.pos, .children = children.ptr };
+        const func = Expression{ .type = .FunctionCall, .value = null, .pos = self.current.pos, .children = children.ptr };
 
         print(">>>>{}\n", .{args});
 
         return func;
     }
 
-    pub fn parse(self: *Parser, min_bp: i8) ParserError!inputession {
+    pub fn parse(self: *Parser, min_bp: i8) ParserError!Expression {
         self.consume(); // Consume the first token (likely an atom, but can be an operator too)
         // self.current now has that token
 
-        var lhs: inputession =
+        var lhs: Expression =
             switch (self.current.tag) {
-                .Integer => inputession{ .type = .Number, .value = .{ .i = try std.fmt.parseInt(i64, self.input[self.current.pos.from..self.current.pos.to], 10) }, .pos = self.current.pos, .children = null },
-                .Real => inputession{ .type = .Number, .value = .{ .f = try std.fmt.parseFloat(f64, self.input[self.current.pos.from..self.current.pos.to]) }, .pos = self.current.pos, .children = null },
-                .Variable => inputession{ .type = .Variable, .value = null, .pos = self.current.pos, .children = null },
+                .Integer => Expression{ .type = .Number, .value = .{ .i = try std.fmt.parseInt(i64, self.input[self.current.pos.from..self.current.pos.to], 10) }, .pos = self.current.pos, .children = null },
+                .Real => Expression{ .type = .Number, .value = .{ .f = try std.fmt.parseFloat(f64, self.input[self.current.pos.from..self.current.pos.to]) }, .pos = self.current.pos, .children = null },
+                .Variable => Expression{ .type = .Variable, .value = null, .pos = self.current.pos, .children = null },
                 .Op => try self.parse_prefix(),
                 .FunctionName => try self.parse_func(),
                 .LParen => paren: {
-                    const expr: inputession = try self.parse_paren(); // Parse the inputession inside parentheses
+                    const expr: Expression = try self.parse_paren(); // Parse the Expression inside parentheses
                     try self.expect(.RParen, ParserError.UnmatchedParentheses); // Consume the ')' token
                     break :paren expr;
                 },
@@ -597,28 +597,28 @@ pub const Parser = struct {
                 }, // Implicit multiplication
                 .LParen => {
                     skip_op = true;
-                }, // Juxtapose inputession
-                .Comma => break, // Comma returns the current inputession
+                }, // Juxtapose Expression
+                .Comma => break, // Comma returns the current Expression
                 .RParen => break, // Stop parsing on closing parenthesis
                 else => return ParserError.UnexpectedToken,
             }
 
             // Convert TokenType to inputType
             const op_text: []const u8 = self.input[op.pos.from..op.pos.to];
-            const op_type: ?inputType = get_infix_operator(op_text, op.tag);
+            const op_type: ?ExprType = get_infix_operator(op_text, op.tag);
             const l_bp, const r_bp = try infix_binding_power(op_type);
             if (l_bp < min_bp) break;
 
             if (!skip_op) self.consume(); // Consume the operator token
 
-            const rhs: inputession = try self.parse(r_bp);
+            const rhs: Expression = try self.parse(r_bp);
 
             // Allocate memory for the children array
-            const children = try self.allocator.alloc(inputession, 2);
+            const children = try self.allocator.alloc(Expression, 2);
             children[0] = lhs;
             children[1] = rhs;
 
-            lhs = inputession{ .type = op_type.?, .value = null, .pos = op.pos, .children = children.ptr };
+            lhs = Expression{ .type = op_type.?, .value = null, .pos = op.pos, .children = children.ptr };
         }
         return lhs;
     }
@@ -627,7 +627,7 @@ pub const Parser = struct {
 pub fn main() !void {
     // Initialize the parsing rules
 
-    var token_stream: TokenStream = try .initCapacity(gpa, 128);
+    var token_stream: TokenStream = .empty;
     defer token_stream.deinit(gpa);
 
     var arena_impl: std.heap.ArenaAllocator = .init(gpa);
@@ -642,13 +642,20 @@ pub fn main() !void {
     std.debug.print("Output Format: {s}\n", .{@tagName(arg_parser.output_format)});
 
     var ip_buffer: [4096]u8 = undefined;
-    const reader: *const std.Io.Reader = if (arg_parser.input_file_path) |input_file_path| blk: {
+    var expr: [:0]u8 = undefined;
+    if (arg_parser.input_file_path) |input_file_path| {
         const file = try std.fs.cwd().openFile(input_file_path, .{});
         defer file.close();
-        break :blk &file.reader(&ip_buffer).interface;
-    } else &std.fs.File.stdin().reader(&ip_buffer).interface;
-
-    const expr = try reader.readToEndAlloc(gpa, 8192);
+        var fr = file.reader(&ip_buffer);
+        var aw: std.Io.Writer.Allocating = .init(gpa);
+        _ = try fr.interface.streamRemaining(&aw.writer);
+        expr = try aw.toOwnedSliceSentinel(0);
+    } else {
+        var fr = std.fs.File.stdin().reader(&.{});
+        var aw: std.Io.Writer.Allocating = .init(gpa);
+        _ = try fr.interface.streamRemaining(&aw.writer);
+        expr = try aw.toOwnedSliceSentinel(0);
+    }
     defer gpa.free(expr);
 
     var tokenizer = Tokenizer.init(expr);
@@ -672,21 +679,21 @@ pub fn main() !void {
 
     print("AST (Polish):\n", .{});
 
+    var op_buffer: [4096]u8 = undefined;
     if (arg_parser.output_file_path) |output_file_path| {
         var file = try std.fs.cwd().createFile(output_file_path, .{});
         defer file.close();
-        const buffer: [4096]u8 = undefined;
-        var writer_impl = file.writer(buffer);
-        const writer = writer_impl.writer();
+        const writer_impl = file.writer(&op_buffer);
+        var writer = writer_impl.interface;
 
-        try polishToString(&ast, expr, writer);
-        try writer_impl.flush();
+        try polishToString(&ast, expr, &writer);
+        try writer.flush();
     } else {
-        var stdout_writer = std.fs.File.stdout().writer(&.{});
-        const stdout = &stdout_writer.interface;
+        const stdout_writer = std.fs.File.stdout().writer(&op_buffer);
+        var stdout = stdout_writer.interface;
 
-        try polishToString(&ast, expr, stdout);
-        try stdout_writer.flush();
+        try polishToString(&ast, expr, &stdout);
+        try stdout.flush();
     }
 }
 
@@ -727,7 +734,7 @@ test "Regular variable tokenization" {
     try testTokenize("sin", &.{ .Variable, .Variable, .Variable });
 }
 
-test "Complex inputession with variables and functions" {
+test "Complex Expression with variables and functions" {
     try testTokenize("a_{1}+\\sin*3", &.{ .Variable, .Op, .FunctionName, .Op, .Integer });
 }
 
@@ -735,7 +742,7 @@ test "Multiple character variables" {
     try testTokenize("abc_{123}", &.{ .Variable, .Variable, .Variable });
 }
 
-test "Complex mathematical inputession" {
+test "Complex mathematical Expression" {
     try testTokenize("a_{1}+\\sin*3.25-2.2.3.3", &.{ .Variable, .Op, .FunctionName, .Op, .Real, .Op, .Real, .Real, .Real });
 }
 
@@ -766,7 +773,7 @@ test "Parser Advanced Polish notation" {
     try testParser("\\sin abc", "(call func (args (*i a b)))");
 }
 
-test "Parser Complex inputessions" {
+test "Parser Complex Expressions" {
     // Test individual parts first
     try testParser("xyz", "(*i (*i x y) z)");
     try testParser("xyz^2", "(*i (*i x y) (^ z 2))");
@@ -775,7 +782,7 @@ test "Parser Complex inputessions" {
     // Test abc^2 part
     try testParser("abc^2", "(*i (*i a b) (^ c 2))");
 
-    // Full complex inputession: -xyz^{2}-abc^{2}
+    // Full complex Expression: -xyz^{2}-abc^{2}
     try testParser("-xyz^2-abc^2", "(- (*i (*i (-u x) y) (^ z 2)) (*i (*i a b) (^ c 2)))");
 }
 
@@ -812,13 +819,13 @@ fn testTokenize(source: [:0]const u8, expected_token_tags: []const TokenType) !v
     print("Success: {s}\n", .{source});
 }
 
-fn printAST(expr: *const inputession, _: u32) void {
+fn printAST(expr: *const Expression, _: u32) void {
     printASTHelper(expr, "", true);
 }
 
 fn testParser(source: [:0]const u8, expected_polish: []const u8) !void {
-    var token_stream: TokenStream = TokenStream.init(gpa);
-    defer token_stream.deinit();
+    var token_stream: TokenStream = .empty;
+    defer token_stream.deinit(gpa);
 
     var arena = std.heap.ArenaAllocator.init(std.heap.page_allocator);
     defer arena.deinit();
@@ -830,7 +837,7 @@ fn testParser(source: [:0]const u8, expected_polish: []const u8) !void {
         if (token.tag == .Eof) {
             break;
         }
-        try token_stream.append(token);
+        try token_stream.append(gpa, token);
         tokenizer.dump(&token);
     }
 
@@ -838,13 +845,14 @@ fn testParser(source: [:0]const u8, expected_polish: []const u8) !void {
     const ast = try parser.parse(0);
 
     // Convert Polish notation to string
-    var polish_writer: std.Io.Writer = .allocating(gpa);
-    defer polish_writer.deinit(gpa);
+    var polish_writer: std.Io.Writer.Allocating = .init(gpa);
+    defer polish_writer.deinit();
+    var writer = polish_writer.writer;
 
-    try polishToString(&ast, source, &polish_writer);
+    try polishToString(&ast, source, &writer);
 
     // Trim trailing whitespace
-    const actual_polish = std.mem.trim(u8, polish_writer.items, " ");
+    const actual_polish = std.mem.trim(u8, polish_writer.written(), " ");
 
     print("Expected: '{s}'\n", .{expected_polish});
     print("Actual:   '{s}'\n", .{actual_polish});
@@ -855,7 +863,7 @@ fn testParser(source: [:0]const u8, expected_polish: []const u8) !void {
     print("Success: {s}\n", .{source});
 }
 
-pub fn polishToString(expr: *const inputession, source: []const u8, writer: *std.Io.Writer) !void {
+pub fn polishToString(expr: *const Expression, source: []const u8, writer: *std.Io.Writer) !void {
     switch (expr.type) {
         .Variable => {
             try writer.print(" {s}", .{source[expr.pos.from..expr.pos.to]});
@@ -1019,7 +1027,7 @@ pub fn polishToString(expr: *const inputession, source: []const u8, writer: *std
     }
 }
 
-fn printASTHelper(expr: *const inputession, prefix: []const u8, is_last: bool) void {
+fn printASTHelper(expr: *const Expression, prefix: []const u8, is_last: bool) void {
     // Print current node with appropriate connector
     const connector = if (is_last) "+-- " else "|-- ";
 
@@ -1110,7 +1118,7 @@ fn printASTHelper(expr: *const inputession, prefix: []const u8, is_last: bool) v
             }
         },
         .Invalid => {
-            print("{s}{s}Invalid inputession\n", .{ prefix, connector });
+            print("{s}{s}Invalid Expression\n", .{ prefix, connector });
         },
     }
 }

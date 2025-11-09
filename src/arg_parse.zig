@@ -2,10 +2,7 @@ const std = @import("std");
 
 const fatal = @import("fatal.zig");
 
-pub const OutputFormat = enum {
-    ast,
-    mathml,
-};
+pub const OutputFormat = enum { ast };
 
 pub const ArgParser = struct {
     input_file_path: ?[]const u8,
@@ -15,7 +12,7 @@ pub const ArgParser = struct {
     pub fn parse(args: []const []const u8) ArgParser {
         var input_file_path: ?[]const u8 = null;
         var output_file_path: ?[]const u8 = null;
-        var output_format: OutputFormat = .mathml;
+        var output_format: OutputFormat = .ast;
 
         const eql = std.mem.eql;
         const startsWith = std.mem.startsWith;
