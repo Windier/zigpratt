@@ -30,7 +30,7 @@ pub fn help() noreturn {
         \\ Options:
         \\  --input, -i       Input file path (default: stdin)
         \\  --output, -o      Output file path (default: stdout)
-        \\  --format, -f      Output format [ast] (default: ast)
+        \\  --format, -f      Output format [ast, polish] (default: ast)
         \\  --help, -h        Print this help message
         \\
     , .{});

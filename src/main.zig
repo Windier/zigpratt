@@ -8,12 +8,15 @@ const arg_parse = @import("arg_parse.zig");
 pub fn main() !void {
     const gpa = std.heap.smp_allocator;
 
-    var token_stream: tex.TokenStream = .empty;
-    defer token_stream.deinit(gpa);
-
     var arena_impl: std.heap.ArenaAllocator = .init(gpa);
     defer arena_impl.deinit();
     const arena = arena_impl.allocator();
+
+    var ip_buffer: [4096]u8 = undefined;
+    var op_buffer: [4096]u8 = undefined;
+
+    var token_stream: tex.TokenStream = .empty;
+    defer token_stream.deinit(gpa);
 
     const args = try std.process.argsAlloc(gpa);
     defer std.process.argsFree(gpa, args);
@@ -22,7 +25,6 @@ pub fn main() !void {
 
     std.debug.print("Output Format: {s}\n", .{@tagName(arg_parser.output_format)});
 
-    var ip_buffer: [4096]u8 = undefined;
     var expr: [:0]u8 = undefined;
     if (arg_parser.input_file_path) |input_file_path| {
         const file = try std.fs.cwd().openFile(input_file_path, .{});
@@ -55,25 +57,24 @@ pub fn main() !void {
     const ast = try parser.parse(0);
     print("input: {}\n", .{ast});
 
-    print("AST (Tree):\n", .{});
-    tex.printAST(&ast, 0);
+    const render: tex.RenderFunctionType = switch (arg_parser.output_format) {
+        .ast => tex.renderAST,
+        .polish => tex.renderPolish,
+    };
 
-    print("AST (Polish):\n", .{});
-
-    var op_buffer: [4096]u8 = undefined;
     if (arg_parser.output_file_path) |output_file_path| {
         var file = try std.fs.cwd().createFile(output_file_path, .{});
         defer file.close();
         const writer_impl = file.writer(&op_buffer);
         var writer = writer_impl.interface;
 
-        try tex.polishToString(&ast, expr, &writer);
+        try render(&writer, &ast, expr);
         try writer.flush();
     } else {
         const stdout_writer = std.fs.File.stdout().writer(&op_buffer);
         var stdout = stdout_writer.interface;
 
-        try tex.polishToString(&ast, expr, &stdout);
+        try render(&stdout, &ast, expr);
         try stdout.flush();
     }
 }

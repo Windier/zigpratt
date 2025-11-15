@@ -41,7 +41,7 @@ export fn getOutputLen() usize {
 }
 
 // Simplified polishToString for WASM
-fn wasmPolishToString(expr: *const tex.Expression, source: []const u8, writer: *std.Io.Writer) !void {
+fn wasmPolishToString(writer: *std.Io.Writer, expr: *const tex.Expression, source: []const u8) !void {
     switch (expr.type) {
         .Variable => {
             try writer.print(" {s}", .{source[expr.pos.from..expr.pos.to]});
@@ -63,86 +63,86 @@ fn wasmPolishToString(expr: *const tex.Expression, source: []const u8, writer: *
         .Add => {
             try writer.print(" (+", .{});
             if (expr.children) |children| {
-                try wasmPolishToString(&children[0], source, writer);
-                try wasmPolishToString(&children[1], source, writer);
+                try wasmPolishToString(writer, &children[0], source);
+                try wasmPolishToString(writer, &children[1], source);
             }
             try writer.print(")", .{});
         },
         .Sub => {
             try writer.print(" (-", .{});
             if (expr.children) |children| {
-                try wasmPolishToString(&children[0], source, writer);
-                try wasmPolishToString(&children[1], source, writer);
+                try wasmPolishToString(writer, &children[0], source);
+                try wasmPolishToString(writer, &children[1], source);
             }
             try writer.print(")", .{});
         },
         .Mul => {
             try writer.print(" (*", .{});
             if (expr.children) |children| {
-                try wasmPolishToString(&children[0], source, writer);
-                try wasmPolishToString(&children[1], source, writer);
+                try wasmPolishToString(writer, &children[0], source);
+                try wasmPolishToString(writer, &children[1], source);
             }
             try writer.print(")", .{});
         },
         .iMul => {
             try writer.print(" (*i", .{});
             if (expr.children) |children| {
-                try wasmPolishToString(&children[0], source, writer);
-                try wasmPolishToString(&children[1], source, writer);
+                try wasmPolishToString(writer, &children[0], source);
+                try wasmPolishToString(writer, &children[1], source);
             }
             try writer.print(")", .{});
         },
         .Div => {
             try writer.print(" (/", .{});
             if (expr.children) |children| {
-                try wasmPolishToString(&children[0], source, writer);
-                try wasmPolishToString(&children[1], source, writer);
+                try wasmPolishToString(writer, &children[0], source);
+                try wasmPolishToString(writer, &children[1], source);
             }
             try writer.print(")", .{});
         },
         .Pow => {
             try writer.print(" (^", .{});
             if (expr.children) |children| {
-                try wasmPolishToString(&children[0], source, writer);
-                try wasmPolishToString(&children[1], source, writer);
+                try wasmPolishToString(writer, &children[0], source);
+                try wasmPolishToString(writer, &children[1], source);
             }
             try writer.print(")", .{});
         },
         .Dot => {
             try writer.print(" (.", .{});
             if (expr.children) |children| {
-                try wasmPolishToString(&children[0], source, writer);
-                try wasmPolishToString(&children[1], source, writer);
+                try wasmPolishToString(writer, &children[0], source);
+                try wasmPolishToString(writer, &children[1], source);
             }
             try writer.print(")", .{});
         },
         .Assignment => {
             try writer.print(" (=", .{});
             if (expr.children) |children| {
-                try wasmPolishToString(&children[0], source, writer);
-                try wasmPolishToString(&children[1], source, writer);
+                try wasmPolishToString(writer, &children[0], source);
+                try wasmPolishToString(writer, &children[1], source);
             }
             try writer.print(")", .{});
         },
         .With => {
             try writer.print(" (with ", .{});
             if (expr.children) |children| {
-                try wasmPolishToString(&children[0], source, writer);
-                try wasmPolishToString(&children[1], source, writer);
+                try wasmPolishToString(writer, &children[0], source);
+                try wasmPolishToString(writer, &children[1], source);
             }
             try writer.print(")", .{});
         },
         .UnaryMinus => {
             try writer.print(" (-u", .{});
             if (expr.children) |children| {
-                try wasmPolishToString(&children[0], source, writer);
+                try wasmPolishToString(writer, &children[0], source);
             }
             try writer.print(")", .{});
         },
         .UnaryPlus => {
             try writer.print(" (+", .{});
             if (expr.children) |children| {
-                try wasmPolishToString(&children[0], source, writer);
+                try wasmPolishToString(writer, &children[0], source);
             }
             try writer.print(")", .{});
         },
@@ -151,7 +151,7 @@ fn wasmPolishToString(expr: *const tex.Expression, source: []const u8, writer: *
             if (expr.children) |children| {
                 const length = expr.value.?.length;
                 for (0..length) |i| {
-                    try wasmPolishToString(&children[i], source, writer);
+                    try wasmPolishToString(writer, &children[i], source);
                 }
             }
             try writer.print(")", .{});
@@ -161,7 +161,7 @@ fn wasmPolishToString(expr: *const tex.Expression, source: []const u8, writer: *
             if (expr.children) |children| {
                 const length = expr.value.?.length;
                 for (0..length) |i| {
-                    try wasmPolishToString(&children[i], source, writer);
+                    try wasmPolishToString(writer, &children[i], source);
                 }
             }
             try writer.print(")", .{});
@@ -171,7 +171,7 @@ fn wasmPolishToString(expr: *const tex.Expression, source: []const u8, writer: *
             if (expr.children) |children| {
                 const length = expr.value.?.length;
                 for (0..length) |i| {
-                    try wasmPolishToString(&children[i], source, writer);
+                    try wasmPolishToString(writer, &children[i], source);
                 }
             }
             try writer.print(")", .{});
@@ -179,23 +179,23 @@ fn wasmPolishToString(expr: *const tex.Expression, source: []const u8, writer: *
         .Comma => {
             try writer.print(", ", .{});
             if (expr.children) |children| {
-                try wasmPolishToString(&children[0], source, writer);
-                try wasmPolishToString(&children[1], source, writer);
+                try wasmPolishToString(writer, &children[0], source);
+                try wasmPolishToString(writer, &children[1], source);
             }
         },
         .FunctionCall => {
             try writer.print(" (call", .{});
             if (expr.children) |children| {
-                try wasmPolishToString(&children[0], source, writer);
-                try wasmPolishToString(&children[1], source, writer);
+                try wasmPolishToString(writer, &children[0], source);
+                try wasmPolishToString(writer, &children[1], source);
             }
             try writer.print(")", .{});
         },
         .Juxt => {
             try writer.print(" (juxt", .{});
             if (expr.children) |children| {
-                try wasmPolishToString(&children[0], source, writer);
-                try wasmPolishToString(&children[1], source, writer);
+                try wasmPolishToString(writer, &children[0], source);
+                try wasmPolishToString(writer, &children[1], source);
             }
             try writer.print(")", .{});
         },
@@ -376,7 +376,7 @@ fn parseExpressionInternal(expr: [:0]const u8, allocator: std.mem.Allocator) ![]
     defer writer_impl.deinit();
     var writer: std.Io.Writer = writer_impl.writer;
 
-    try wasmPolishToString(&ast, expr, &writer);
+    try wasmPolishToString(&writer, &ast, expr);
 
     const result = std.mem.trim(u8, writer_impl.written(), " ");
 

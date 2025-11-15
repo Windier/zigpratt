@@ -167,7 +167,7 @@ pub const Parser = struct {
 
     pub fn parse_paren(self: *Parser) ParserError!Expression {
 
-        // print("Entering paren\n", .{});
+        // writer.print("Entering paren\n", .{});
         // Paren can be for grouping (has .Comma) or simply to wrap an Expression
         // Lookahead for commas
         var level: i32 = 0;
@@ -258,7 +258,7 @@ pub const Parser = struct {
                 else => return ParserError.UnexpectedToken,
             };
 
-        // print("Parsed lhs: {s} text: {s}\n", .{ @tagName(lhs.type), self.input[lhs.pos.from..lhs.pos.to] });
+        // writer.print("Parsed lhs: {s} text: {s}\n", .{ @tagName(lhs.type), self.input[lhs.pos.from..lhs.pos.to] });
 
         while (true) {
             const op = self.peek();
@@ -342,8 +342,9 @@ test "Parser Edge cases" {
     try testParser(alloc, "2*x", "(* 2 x)"); // Explicit multiplication
 }
 
-pub fn printAST(expr: *const Expression, _: u32) void {
-    printASTHelper(expr, "", true);
+pub fn renderAST(writer: *std.Io.Writer, expr: *const Expression, source: []const u8) std.Io.Writer.Error!void {
+    _ = source;
+    try renderASTHelper(writer, expr, "", true);
 }
 
 fn testParser(gpa: std.mem.Allocator, source: [:0]const u8, expected_polish: []const u8) !void {
@@ -372,7 +373,7 @@ fn testParser(gpa: std.mem.Allocator, source: [:0]const u8, expected_polish: []c
     defer polish_writer.deinit();
     var writer = polish_writer.writer;
 
-    try polishToString(&ast, source, &writer);
+    try renderPolish(&writer, &ast, source);
 
     // Trim trailing whitespace
     const actual_polish = std.mem.trim(u8, polish_writer.written(), " ");
@@ -386,7 +387,7 @@ fn testParser(gpa: std.mem.Allocator, source: [:0]const u8, expected_polish: []c
     print("Success: {s}\n", .{source});
 }
 
-pub fn polishToString(expr: *const Expression, source: []const u8, writer: *std.Io.Writer) !void {
+pub fn renderPolish(writer: *std.Io.Writer, expr: *const Expression, source: []const u8) std.Io.Writer.Error!void {
     switch (expr.type) {
         .Variable => {
             try writer.print(" {s}", .{source[expr.pos.from..expr.pos.to]});
@@ -408,86 +409,86 @@ pub fn polishToString(expr: *const Expression, source: []const u8, writer: *std.
         .Add => {
             try writer.print(" (+", .{});
             if (expr.children) |children| {
-                try polishToString(&children[0], source, writer);
-                try polishToString(&children[1], source, writer);
+                try renderPolish(writer, &children[0], source);
+                try renderPolish(writer, &children[1], source);
             }
             try writer.print(")", .{});
         },
         .Sub => {
             try writer.print(" (-", .{});
             if (expr.children) |children| {
-                try polishToString(&children[0], source, writer);
-                try polishToString(&children[1], source, writer);
+                try renderPolish(writer, &children[0], source);
+                try renderPolish(writer, &children[1], source);
             }
             try writer.print(")", .{});
         },
         .Mul => {
             try writer.print(" (*", .{});
             if (expr.children) |children| {
-                try polishToString(&children[0], source, writer);
-                try polishToString(&children[1], source, writer);
+                try renderPolish(writer, &children[0], source);
+                try renderPolish(writer, &children[1], source);
             }
             try writer.print(")", .{});
         },
         .iMul => {
             try writer.print(" (*i", .{});
             if (expr.children) |children| {
-                try polishToString(&children[0], source, writer);
-                try polishToString(&children[1], source, writer);
+                try renderPolish(writer, &children[0], source);
+                try renderPolish(writer, &children[1], source);
             }
             try writer.print(")", .{});
         },
         .Div => {
             try writer.print(" (/", .{});
             if (expr.children) |children| {
-                try polishToString(&children[0], source, writer);
-                try polishToString(&children[1], source, writer);
+                try renderPolish(writer, &children[0], source);
+                try renderPolish(writer, &children[1], source);
             }
             try writer.print(")", .{});
         },
         .Pow => {
             try writer.print(" (^", .{});
             if (expr.children) |children| {
-                try polishToString(&children[0], source, writer);
-                try polishToString(&children[1], source, writer);
+                try renderPolish(writer, &children[0], source);
+                try renderPolish(writer, &children[1], source);
             }
             try writer.print(")", .{});
         },
         .Dot => {
             try writer.print(" (.", .{});
             if (expr.children) |children| {
-                try polishToString(&children[0], source, writer);
-                try polishToString(&children[1], source, writer);
+                try renderPolish(writer, &children[0], source);
+                try renderPolish(writer, &children[1], source);
             }
             try writer.print(")", .{});
         },
         .Assignment => {
             try writer.print(" (=", .{});
             if (expr.children) |children| {
-                try polishToString(&children[0], source, writer);
-                try polishToString(&children[1], source, writer);
+                try renderPolish(writer, &children[0], source);
+                try renderPolish(writer, &children[1], source);
             }
             try writer.print(")", .{});
         },
         .With => {
             try writer.print(" (with ", .{});
             if (expr.children) |children| {
-                try polishToString(&children[0], source, writer);
-                try polishToString(&children[1], source, writer);
+                try renderPolish(writer, &children[0], source);
+                try renderPolish(writer, &children[1], source);
             }
             try writer.print(")", .{});
         },
         .UnaryMinus => {
             try writer.print(" (-u", .{});
             if (expr.children) |children| {
-                try polishToString(&children[0], source, writer);
+                try renderPolish(writer, &children[0], source);
             }
             try writer.print(")", .{});
         },
         .UnaryPlus => {
             try writer.print(" (+", .{});
             if (expr.children) |children| {
-                try polishToString(&children[0], source, writer);
+                try renderPolish(writer, &children[0], source);
             }
             try writer.print(")", .{});
         },
@@ -496,7 +497,7 @@ pub fn polishToString(expr: *const Expression, source: []const u8, writer: *std.
             if (expr.children) |children| {
                 const length = expr.value.?.length;
                 for (0..length) |i| {
-                    try polishToString(&children[i], source, writer);
+                    try renderPolish(writer, &children[i], source);
                 }
             }
             try writer.print(")", .{});
@@ -506,7 +507,7 @@ pub fn polishToString(expr: *const Expression, source: []const u8, writer: *std.
             if (expr.children) |children| {
                 const length = expr.value.?.length;
                 for (0..length) |i| {
-                    try polishToString(&children[i], source, writer);
+                    try renderPolish(writer, &children[i], source);
                 }
             }
             try writer.print(")", .{});
@@ -516,7 +517,7 @@ pub fn polishToString(expr: *const Expression, source: []const u8, writer: *std.
             if (expr.children) |children| {
                 const length = expr.value.?.length;
                 for (0..length) |i| {
-                    try polishToString(&children[i], source, writer);
+                    try renderPolish(writer, &children[i], source);
                 }
             }
             try writer.print(")", .{});
@@ -524,23 +525,23 @@ pub fn polishToString(expr: *const Expression, source: []const u8, writer: *std.
         .Comma => {
             try writer.print(", ", .{});
             if (expr.children) |children| {
-                try polishToString(&children[0], source, writer);
-                try polishToString(&children[1], source, writer);
+                try renderPolish(writer, &children[0], source);
+                try renderPolish(writer, &children[1], source);
             }
         },
         .FunctionCall => {
             try writer.print(" (call", .{});
             if (expr.children) |children| {
-                try polishToString(&children[0], source, writer);
-                try polishToString(&children[1], source, writer);
+                try renderPolish(writer, &children[0], source);
+                try renderPolish(writer, &children[1], source);
             }
             try writer.print(")", .{});
         },
         .Juxt => {
             try writer.print(" (juxt", .{});
             if (expr.children) |children| {
-                try polishToString(&children[0], source, writer);
-                try polishToString(&children[1], source, writer);
+                try renderPolish(writer, &children[0], source);
+                try renderPolish(writer, &children[1], source);
             }
             try writer.print(")", .{});
         },
@@ -550,30 +551,30 @@ pub fn polishToString(expr: *const Expression, source: []const u8, writer: *std.
     }
 }
 
-fn printASTHelper(expr: *const Expression, prefix: []const u8, is_last: bool) void {
+fn renderASTHelper(writer: *std.Io.Writer, expr: *const Expression, prefix: []const u8, is_last: bool) std.Io.Writer.Error!void {
     // Print current node with appropriate connector
     const connector = if (is_last) "+-- " else "|-- ";
 
     switch (expr.type) {
         .Variable => {
-            print("{s}{s}Var\n", .{ prefix, connector });
+            try writer.print("{s}{s}Var\n", .{ prefix, connector });
         },
         .FunctionName => {
-            print("{s}{s}FuncName\n", .{ prefix, connector });
+            try writer.print("{s}{s}FuncName\n", .{ prefix, connector });
         },
         .Number => {
             if (expr.value) |val| {
                 switch (val) {
-                    .i => |i| print("{s}{s}Number: {d}\n", .{ prefix, connector, i }),
-                    .f => |f| print("{s}{s}Number: {d}\n", .{ prefix, connector, f }),
+                    .i => |i| try writer.print("{s}{s}Number: {d}\n", .{ prefix, connector, i }),
+                    .f => |f| try writer.print("{s}{s}Number: {d}\n", .{ prefix, connector, f }),
                     else => unreachable,
                 }
             } else {
-                print("{s}{s}Number: <no value>\n", .{ prefix, connector });
+                try writer.print("{s}{s}Number: <no value>\n", .{ prefix, connector });
             }
         },
         .Add, .Sub, .Mul, .Div, .Dot, .Pow, .Juxt, .Comma, .With, .Assignment => {
-            print("{s}{s}{s}\n", .{ prefix, connector, @tagName(expr.type) });
+            try writer.print("{s}{s}{s}\n", .{ prefix, connector, @tagName(expr.type) });
             if (expr.children) |children| {
                 // Create new prefix: extend current with either spaces or vertical bar
                 var new_prefix: [256]u8 = undefined;
@@ -582,12 +583,12 @@ fn printASTHelper(expr: *const Expression, prefix: []const u8, is_last: bool) vo
                 @memcpy(new_prefix[0..prefix.len], prefix);
                 @memcpy(new_prefix[prefix.len..new_len], extension);
 
-                printASTHelper(&children[0], new_prefix[0..new_len], false);
-                printASTHelper(&children[1], new_prefix[0..new_len], true);
+                try renderASTHelper(writer, &children[0], new_prefix[0..new_len], false);
+                try renderASTHelper(writer, &children[1], new_prefix[0..new_len], true);
             }
         },
         .Object, .Arguments, .Paren => {
-            print("{s}{s}{s}\n", .{ prefix, connector, @tagName(expr.type) });
+            try writer.print("{s}{s}{s}\n", .{ prefix, connector, @tagName(expr.type) });
             if (expr.children) |children| {
                 var new_prefix: [256]u8 = undefined;
                 const extension = if (is_last) "    " else "|   ";
@@ -598,12 +599,12 @@ fn printASTHelper(expr: *const Expression, prefix: []const u8, is_last: bool) vo
                 const length = expr.value.?.length;
                 for (0..length) |i| {
                     const is_last_child = (i == length - 1);
-                    printASTHelper(&children[i], new_prefix[0..new_len], is_last_child);
+                    try renderASTHelper(writer, &children[i], new_prefix[0..new_len], is_last_child);
                 }
             }
         },
         .iMul => {
-            print("{s}{s}Mul\n", .{ prefix, connector });
+            try writer.print("{s}{s}Mul\n", .{ prefix, connector });
             if (expr.children) |children| {
                 var new_prefix: [256]u8 = undefined;
                 const extension = if (is_last) "    " else "|   ";
@@ -611,12 +612,12 @@ fn printASTHelper(expr: *const Expression, prefix: []const u8, is_last: bool) vo
                 @memcpy(new_prefix[0..prefix.len], prefix);
                 @memcpy(new_prefix[prefix.len..new_len], extension);
 
-                printASTHelper(&children[0], new_prefix[0..new_len], false);
-                printASTHelper(&children[1], new_prefix[0..new_len], true);
+                try renderASTHelper(writer, &children[0], new_prefix[0..new_len], false);
+                try renderASTHelper(writer, &children[1], new_prefix[0..new_len], true);
             }
         },
         .FunctionCall => {
-            print("{s}{s}Call\n", .{ prefix, connector });
+            try writer.print("{s}{s}Call\n", .{ prefix, connector });
             if (expr.children) |children| {
                 var new_prefix: [256]u8 = undefined;
                 const extension = if (is_last) "    " else "|   ";
@@ -624,12 +625,12 @@ fn printASTHelper(expr: *const Expression, prefix: []const u8, is_last: bool) vo
                 @memcpy(new_prefix[0..prefix.len], prefix);
                 @memcpy(new_prefix[prefix.len..new_len], extension);
 
-                printASTHelper(&children[0], new_prefix[0..new_len], false);
-                printASTHelper(&children[1], new_prefix[0..new_len], true);
+                try renderASTHelper(writer, &children[0], new_prefix[0..new_len], false);
+                try renderASTHelper(writer, &children[1], new_prefix[0..new_len], true);
             }
         },
         .UnaryMinus, .UnaryPlus => {
-            print("{s}{s}{s}\n", .{ prefix, connector, @tagName(expr.type) });
+            try writer.print("{s}{s}{s}\n", .{ prefix, connector, @tagName(expr.type) });
             if (expr.children) |children| {
                 var new_prefix: [256]u8 = undefined;
                 const extension = if (is_last) "    " else "|   ";
@@ -637,11 +638,11 @@ fn printASTHelper(expr: *const Expression, prefix: []const u8, is_last: bool) vo
                 @memcpy(new_prefix[0..prefix.len], prefix);
                 @memcpy(new_prefix[prefix.len..new_len], extension);
 
-                printASTHelper(&children[0], new_prefix[0..new_len], true);
+                try renderASTHelper(writer, &children[0], new_prefix[0..new_len], true);
             }
         },
         .Invalid => {
-            print("{s}{s}Invalid Expression\n", .{ prefix, connector });
+            try writer.print("{s}{s}Invalid Expression\n", .{ prefix, connector });
         },
     }
 }

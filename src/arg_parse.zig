@@ -2,7 +2,10 @@ const std = @import("std");
 
 const fatal = @import("fatal.zig");
 
-pub const OutputFormat = enum { ast };
+pub const OutputFormat = enum {
+    ast,
+    polish,
+};
 
 pub const ArgParser = struct {
     input_file_path: ?[]const u8,
