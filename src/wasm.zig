@@ -3,6 +3,23 @@ const ArrayList = std.ArrayList;
 
 const tex = @import("root.zig");
 
+pub const std_options: std.Options = .{
+    .logFn = logFn,
+};
+
+pub fn logFn(
+    comptime level: std.log.Level,
+    comptime scope: @Type(.enum_literal),
+    comptime format: []const u8,
+    args: anytype,
+) void {
+    _ = level;
+    _ = scope;
+    _ = format;
+    _ = args;
+    // No-op for WASM
+}
+
 // WASM memory for string exchange
 var output_writer: [2048]u8 = undefined;
 var output_len: usize = 0;
