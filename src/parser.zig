@@ -70,7 +70,7 @@ pub fn get_prefix_operator(text: []const u8) ?ExprType {
 
 pub const Expression = struct {
     type: ExprType,
-    value: ?union(enum) { i: i64, f: f64, length: u64 },
+    value: ?union(enum) { i: i64, f: f64, length: usize },
     pos: tok.Loc,
     children: ?[*]Expression, // Might be null for literals
 };
