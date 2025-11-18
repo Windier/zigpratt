@@ -374,9 +374,8 @@ fn parseExpressionInternal(expr: [:0]const u8, allocator: std.mem.Allocator) ![]
 
     var writer_impl: std.Io.Writer.Allocating = .init(allocator);
     defer writer_impl.deinit();
-    var writer: std.Io.Writer = writer_impl.writer;
 
-    try wasmPolishToString(&writer, &ast, expr);
+    try wasmPolishToString(&writer_impl.writer, &ast, expr);
 
     const result = std.mem.trim(u8, writer_impl.written(), " ");
 
@@ -402,9 +401,8 @@ fn parseExpressionToTreeInternal(expr: [:0]const u8, allocator: std.mem.Allocato
 
     var writer_impl: std.Io.Writer.Allocating = .init(allocator);
     defer writer_impl.deinit();
-    var json_writer: std.Io.Writer = writer_impl.writer;
 
-    try wasmTreeToJson(&ast, expr, &json_writer);
+    try wasmTreeToJson(&ast, expr, &writer_impl.writer);
 
     const result = std.mem.trim(u8, writer_impl.written(), " ");
 
