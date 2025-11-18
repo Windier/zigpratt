@@ -1,0 +1,15 @@
+Output Format: ast
+Tokens:
+Comment(% this is a comment)
+Text(a)
+Symbol(+)
+Text(b)
+Comment(% inline comment)
+Root: ""
+  Comment: "% this is a comment"
+  Text: "a"
+  Symbol: "+"
+  Text: "b"
+  Comment: "% inline comment"
+
+ ----- EXIT CODE: 0 -----

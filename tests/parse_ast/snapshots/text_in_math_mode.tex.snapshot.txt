@@ -1,0 +1,23 @@
+Output Format: ast
+Tokens:
+TextMode(velocity)
+Symbol(=)
+ControlSequence(\frac)
+GroupOpen({)
+Text(d)
+GroupClose(})
+GroupOpen({)
+Text(t)
+GroupClose(})
+Root: ""
+  Text: "velocity"
+  Symbol: "="
+  Command: "\frac"
+  Text: "d"
+  Group: "{"
+    Text: "d"
+  Text: "t"
+  Group: "{"
+    Text: "t"
+
+ ----- EXIT CODE: 0 -----

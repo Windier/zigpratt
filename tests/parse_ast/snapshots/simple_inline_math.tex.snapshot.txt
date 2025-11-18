@@ -1,0 +1,19 @@
+Output Format: ast
+Tokens:
+MathInlineToggle($)
+Text(a)
+Symbol(+)
+Text(b)
+Symbol(=)
+Text(c)
+MathInlineToggle($)
+Root: ""
+  MathInline: "$"
+  Text: "a"
+  Symbol: "+"
+  Text: "b"
+  Symbol: "="
+  Text: "c"
+  MathInline: "$"
+
+ ----- EXIT CODE: 0 -----

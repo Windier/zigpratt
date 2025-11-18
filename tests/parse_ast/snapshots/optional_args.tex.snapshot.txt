@@ -1,0 +1,19 @@
+Output Format: ast
+Tokens:
+ControlSequence(\sqrt)
+OptionalArgOpen([)
+Text(3)
+OptionalArgClose(])
+GroupOpen({)
+Text(x)
+GroupClose(})
+Root: ""
+  Command: "\sqrt"
+  Text: "3"
+  OptionalArg: "["
+    Text: "3"
+  Text: "x"
+  Group: "{"
+    Text: "x"
+
+ ----- EXIT CODE: 0 -----

@@ -1,0 +1,19 @@
+Output Format: ast
+Tokens:
+Text(x)
+Symbol(~)
+Text(y)
+ControlSequence(\approx)
+Text(z)
+ControlSequence(\neq)
+Text(a)
+Root: ""
+  Text: "x"
+  Symbol: "~"
+  Text: "y"
+  Command: "\approx"
+  Text: "z"
+  Command: "\neq"
+  Text: "a"
+
+ ----- EXIT CODE: 0 -----
