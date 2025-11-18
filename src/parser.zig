@@ -1,8 +1,6 @@
 const std = @import("std");
-const print = std.debug.print;
 const expect = std.testing.expect;
 const ArrayList = std.ArrayList;
-const alloc = std.heap.smp_allocator;
 
 const tok = @import("tokenizer.zig");
 
@@ -116,7 +114,7 @@ pub const Parser = struct {
             return;
         }
         self.current = self.token_stream.items[self.head];
-        print("Current token: {s} text: {s}\n", .{ @tagName(self.current.tag), self.input[self.current.pos.from..self.current.pos.to] });
+        std.log.debug("Current token: {s} text: {s}\n", .{ @tagName(self.current.tag), self.input[self.current.pos.from..self.current.pos.to] });
         self.head += 1;
     }
 
@@ -124,7 +122,7 @@ pub const Parser = struct {
         if (self.head >= self.token_stream.items.len) {
             return .{ .tag = .Eof, .pos = .{ .from = 0, .to = 0 } };
         }
-        print("Peeking token: {s} text: {s}\n", .{ @tagName(self.token_stream.items[self.head].tag), self.input[self.token_stream.items[self.head].pos.from..self.token_stream.items[self.head].pos.to] });
+        std.log.debug("Peeking token: {s} text: {s}\n", .{ @tagName(self.token_stream.items[self.head].tag), self.input[self.token_stream.items[self.head].pos.from..self.token_stream.items[self.head].pos.to] });
         return self.token_stream.items[self.head];
     }
 
@@ -233,7 +231,7 @@ pub const Parser = struct {
 
         const func = Expression{ .type = .FunctionCall, .value = null, .pos = self.current.pos, .children = children.ptr };
 
-        print(">>>>{}\n", .{args});
+        std.log.debug(">>>>{}\n", .{args});
 
         return func;
     }
@@ -299,6 +297,7 @@ pub const Parser = struct {
 };
 
 test "Parser Polish notation" {
+    const alloc = std.heap.smp_allocator;
     try testParser(alloc, "a+b", "(+ a b)");
     try testParser(alloc, "a*b+c", "(+ (* a b) c)");
     try testParser(alloc, "a+b*c", "(+ a (* b c))");
@@ -307,6 +306,7 @@ test "Parser Polish notation" {
 }
 
 test "Parser Advanced Polish notation" {
+    const alloc = std.heap.smp_allocator;
     try testParser(alloc, "-x^2-y^2", "(- (-u (^ x 2)) (^ y 2))");
     try testParser(alloc, "-a-b-c-d", "(- (- (- (-u a) b) c) d)");
     try testParser(alloc, "abc", "(*i (*i a b) c)");
@@ -314,6 +314,7 @@ test "Parser Advanced Polish notation" {
 }
 
 test "Parser Complex Expressions" {
+    const alloc = std.heap.smp_allocator;
     // Test individual parts first
     try testParser(alloc, "xyz", "(*i (*i x y) z)");
     try testParser(alloc, "xyz^2", "(*i (*i x y) (^ z 2))");
@@ -327,6 +328,7 @@ test "Parser Complex Expressions" {
 }
 
 test "Parser Edge cases" {
+    const alloc = std.heap.smp_allocator;
     // Operator precedence tests
     try testParser(alloc, "a+b*c^d", "(+ a (* b (^ c d)))");
     try testParser(alloc, "a^b+c*d", "(+ (^ a b) (* c d))");
@@ -377,13 +379,13 @@ fn testParser(gpa: std.mem.Allocator, source: [:0]const u8, expected_polish: []c
     // Trim trailing whitespace
     const actual_polish = std.mem.trim(u8, polish_writer.written(), " ");
 
-    print("Expected: '{s}'\n", .{expected_polish});
-    print("Actual:   '{s}'\n", .{actual_polish});
+    std.log.debug("Expected: '{s}'\n", .{expected_polish});
+    std.log.debug("Actual:   '{s}'\n", .{actual_polish});
 
     try std.testing.expectEqualStrings(expected_polish, actual_polish);
 
     // Print success
-    print("Success: {s}\n", .{source});
+    std.log.debug("Success: {s}\n", .{source});
 }
 
 pub fn renderPolish(writer: *std.Io.Writer, expr: *const Expression, source: []const u8) std.Io.Writer.Error!void {
