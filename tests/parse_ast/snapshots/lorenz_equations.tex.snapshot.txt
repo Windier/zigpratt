@@ -1,83 +1,84 @@
-Output Format: ast
-Tokens:
-EnvironmentBegin(aligned)
-ControlSequence(\dot)
-GroupOpen({)
-Text(x)
-GroupClose(})
-Alignment(&)
-Symbol(=)
-ControlSequence(\sigma)
-Symbol(()
-Text(y)
-Symbol(-)
-Text(x)
-Symbol())
-NewlineCommand(\\)
-ControlSequence(\dot)
-GroupOpen({)
-Text(y)
-GroupClose(})
-Alignment(&)
-Symbol(=)
-ControlSequence(\rho)
-Text(x)
-Symbol(-)
-Text(y)
-Symbol(-)
-Text(xz)
-NewlineCommand(\\)
-ControlSequence(\dot)
-GroupOpen({)
-Text(z)
-GroupClose(})
-Alignment(&)
-Symbol(=)
-Symbol(-)
-ControlSequence(\beta)
-Text(z)
-Symbol(+)
-Text(xy)
-EnvironmentEnd(aligned)
-Root: ""
-  Environment: "aligned"
-  Command: "\dot"
-  Text: "x"
-  Group: "{"
-    Text: "x"
-  Alignment: "&"
-  Symbol: "="
-  Command: "\sigma"
-  Symbol: "("
-  Text: "y"
-  Symbol: "-"
-  Text: "x"
-  Symbol: ")"
-  Newline: "\\"
-  Command: "\dot"
-  Text: "y"
-  Group: "{"
-    Text: "y"
-  Alignment: "&"
-  Symbol: "="
-  Command: "\rho"
-  Text: "x"
-  Symbol: "-"
-  Text: "y"
-  Symbol: "-"
-  Text: "xz"
-  Newline: "\\"
-  Command: "\dot"
-  Text: "z"
-  Group: "{"
-    Text: "z"
-  Alignment: "&"
-  Symbol: "="
-  Symbol: "-"
-  Command: "\beta"
-  Text: "z"
-  Symbol: "+"
-  Text: "xy"
-  Environment: "aligned"
+info: Output Format: ast
 
- ----- EXIT CODE: 0 -----
+debug: Invalid "begin"
+debug: LBrace "{"
+debug: Variable "a"
+debug: Variable "l"
+debug: Variable "i"
+debug: Variable "g"
+debug: Variable "n"
+debug: Variable "e"
+debug: Variable "d"
+debug: RBrace "}"
+debug: Invalid "
+"
+debug: Invalid "dot"
+debug: LBrace "{"
+debug: Variable "x"
+debug: RBrace "}"
+debug: Invalid "&"
+debug: Op "="
+debug: Invalid "sigma"
+debug: LParen "("
+debug: Variable "y"
+debug: Op "-"
+debug: Variable "x"
+debug: RParen ")"
+debug: Invalid "\"
+debug: Invalid "
+"
+debug: Invalid "dot"
+debug: LBrace "{"
+debug: Variable "y"
+debug: RBrace "}"
+debug: Invalid "&"
+debug: Op "="
+debug: Invalid "rho"
+debug: Variable "x"
+debug: Op "-"
+debug: Variable "y"
+debug: Op "-"
+debug: Variable "x"
+debug: Variable "z"
+debug: Invalid "\"
+debug: Invalid "
+"
+debug: Invalid "dot"
+debug: LBrace "{"
+debug: Variable "z"
+debug: RBrace "}"
+debug: Invalid "&"
+debug: Op "="
+debug: Op "-"
+debug: Invalid "beta"
+debug: Variable "z"
+debug: Op "+"
+debug: Variable "x"
+debug: Variable "y"
+debug: Invalid "
+"
+debug: Invalid "end"
+debug: LBrace "{"
+debug: Variable "a"
+debug: Variable "l"
+debug: Variable "i"
+debug: Variable "g"
+debug: Variable "n"
+debug: Variable "e"
+debug: Variable "d"
+debug: RBrace "}"
+debug: Invalid "
+"
+debug: --eof--
+info: Token stream length: 64
+debug: Current token: Invalid text: begin
+error: UnexpectedToken
+[1m/Users/jan/projects/zig-tex/src/parser.zig:256:25[0m: [2m0x104c76193 in parse (zig-tex)[0m
+                else => return ParserError.UnexpectedToken,
+                        [32m^[0m
+[1m/Users/jan/projects/zig-tex/src/main.zig:56:17[0m: [2m0x104c72dd7 in main (zig-tex)[0m
+    const ast = try parser.parse(0);
+                [32m^[0m
+
+
+ ----- EXIT CODE: 1 -----

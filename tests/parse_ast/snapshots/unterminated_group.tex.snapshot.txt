@@ -1,18 +1,24 @@
-Output Format: ast
-Tokens:
-ControlSequence(\frac)
-GroupOpen({)
-Text(a)
-GroupClose(})
-GroupOpen({)
-Text(b)
-Root: ""
-  Command: "\frac"
-  Text: "a"
-  Group: "{"
-    Text: "a"
-  Text: "b"
-  Group: "{"
-    Text: "b"
+info: Output Format: ast
 
- ----- EXIT CODE: 0 -----
+debug: Keyword found: frac -> Fraction
+debug: Fraction "frac"
+debug: LBrace "{"
+debug: Variable "a"
+debug: RBrace "}"
+debug: LBrace "{"
+debug: Variable "b"
+debug: Invalid "
+"
+debug: --eof--
+info: Token stream length: 7
+debug: Current token: Fraction text: frac
+error: UnexpectedToken
+[1m/Users/jan/projects/zig-tex/src/parser.zig:256:25[0m: [2m0x105082193 in parse (zig-tex)[0m
+                else => return ParserError.UnexpectedToken,
+                        [32m^[0m
+[1m/Users/jan/projects/zig-tex/src/main.zig:56:17[0m: [2m0x10507edd7 in main (zig-tex)[0m
+    const ast = try parser.parse(0);
+                [32m^[0m
+
+
+ ----- EXIT CODE: 1 -----

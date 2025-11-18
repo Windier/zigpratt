@@ -1,21 +1,32 @@
-Output Format: ast
-Tokens:
-Text(x)
-Symbol(=)
-Text(1)
-NewlineCommand(\\)
-NewlineCommand(\\)
-Text(y)
-Symbol(=)
-Text(2)
-Root: ""
-  Text: "x"
-  Symbol: "="
-  Text: "1"
-  Newline: "\\"
-  Newline: "\\"
-  Text: "y"
-  Symbol: "="
-  Text: "2"
+info: Output Format: ast
 
- ----- EXIT CODE: 0 -----
+debug: Variable "x"
+debug: Op "="
+debug: Integer "1"
+debug: Invalid "\"
+debug: Invalid "\"
+debug: Variable "y"
+debug: Op "="
+debug: Integer "2"
+debug: Invalid "
+"
+debug: --eof--
+info: Token stream length: 9
+debug: Current token: Variable text: x
+debug: Peeking token: Op text: =
+debug: Current token: Op text: =
+debug: Current token: Integer text: 1
+debug: Peeking token: Invalid text: \
+error: UnexpectedToken
+[1m/Users/jan/projects/zig-tex/src/parser.zig:275:25[0m: [2m0x102fba3bb in parse (zig-tex)[0m
+                else => return ParserError.UnexpectedToken,
+                        [32m^[0m
+[1m/Users/jan/projects/zig-tex/src/parser.zig:286:37[0m: [2m0x102fba5d7 in parse (zig-tex)[0m
+            const rhs: Expression = try self.parse(r_bp);
+                                    [32m^[0m
+[1m/Users/jan/projects/zig-tex/src/main.zig:56:17[0m: [2m0x102fb6dd7 in main (zig-tex)[0m
+    const ast = try parser.parse(0);
+                [32m^[0m
+
+
+ ----- EXIT CODE: 1 -----

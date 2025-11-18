@@ -1,31 +1,32 @@
-Output Format: ast
-Tokens:
-MathDisplayToggle($$)
-Text(x)
-Superscript(^)
-Text(2)
-Symbol(+)
-Text(y)
-Superscript(^)
-Text(2)
-Symbol(=)
-Text(z)
-Superscript(^)
-Text(2)
-MathDisplayToggle($$)
-Root: ""
-  MathDisplay: "$$"
-  Text: "x"
-  Superscript: "^"
-  Text: "2"
-  Symbol: "+"
-  Text: "y"
-  Superscript: "^"
-  Text: "2"
-  Symbol: "="
-  Text: "z"
-  Superscript: "^"
-  Text: "2"
-  MathDisplay: "$$"
+info: Output Format: ast
 
- ----- EXIT CODE: 0 -----
+debug: Invalid "$"
+debug: Invalid "$"
+debug: Variable "x"
+debug: Op "^"
+debug: Integer "2"
+debug: Op "+"
+debug: Variable "y"
+debug: Op "^"
+debug: Integer "2"
+debug: Op "="
+debug: Variable "z"
+debug: Op "^"
+debug: Integer "2"
+debug: Invalid "$"
+debug: Invalid "$"
+debug: Invalid "
+"
+debug: --eof--
+info: Token stream length: 16
+debug: Current token: Invalid text: $
+error: UnexpectedToken
+[1m/Users/jan/projects/zig-tex/src/parser.zig:256:25[0m: [2m0x100716193 in parse (zig-tex)[0m
+                else => return ParserError.UnexpectedToken,
+                        [32m^[0m
+[1m/Users/jan/projects/zig-tex/src/main.zig:56:17[0m: [2m0x100712dd7 in main (zig-tex)[0m
+    const ast = try parser.parse(0);
+                [32m^[0m
+
+
+ ----- EXIT CODE: 1 -----

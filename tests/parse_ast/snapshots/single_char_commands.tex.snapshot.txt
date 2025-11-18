@@ -1,11 +1,30 @@
-Output Format: ast
-Tokens:
-NewlineCommand(\\)
-NewlineCommand(\\)
-Comment(% \\$ \\& \\_ \\{ \\})
-Root: ""
-  Newline: "\\"
-  Newline: "\\"
-  Comment: "% \\$ \\& \\_ \\{ \\}"
+info: Output Format: ast
 
- ----- EXIT CODE: 0 -----
+debug: Invalid "\"
+debug: Invalid "\"
+debug: Invalid "%"
+debug: Invalid "\"
+debug: Invalid "$"
+debug: Invalid "\"
+debug: Invalid "&"
+debug: Invalid "\"
+debug: Invalid "_"
+debug: Invalid "\"
+debug: LBrace "{"
+debug: Invalid "\"
+debug: RBrace "}"
+debug: Invalid "
+"
+debug: --eof--
+info: Token stream length: 14
+debug: Current token: Invalid text: \
+error: UnexpectedToken
+[1m/Users/jan/projects/zig-tex/src/parser.zig:256:25[0m: [2m0x102f0a193 in parse (zig-tex)[0m
+                else => return ParserError.UnexpectedToken,
+                        [32m^[0m
+[1m/Users/jan/projects/zig-tex/src/main.zig:56:17[0m: [2m0x102f06dd7 in main (zig-tex)[0m
+    const ast = try parser.parse(0);
+                [32m^[0m
+
+
+ ----- EXIT CODE: 1 -----

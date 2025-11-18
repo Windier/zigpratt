@@ -114,7 +114,7 @@ pub const Parser = struct {
             return;
         }
         self.current = self.token_stream.items[self.head];
-        std.log.debug("Current token: {s} text: {s}\n", .{ @tagName(self.current.tag), self.input[self.current.pos.from..self.current.pos.to] });
+        std.log.debug("Current token: {s} text: {s}", .{ @tagName(self.current.tag), self.input[self.current.pos.from..self.current.pos.to] });
         self.head += 1;
     }
 
@@ -122,7 +122,7 @@ pub const Parser = struct {
         if (self.head >= self.token_stream.items.len) {
             return .{ .tag = .Eof, .pos = .{ .from = 0, .to = 0 } };
         }
-        std.log.debug("Peeking token: {s} text: {s}\n", .{ @tagName(self.token_stream.items[self.head].tag), self.input[self.token_stream.items[self.head].pos.from..self.token_stream.items[self.head].pos.to] });
+        std.log.debug("Peeking token: {s} text: {s}", .{ @tagName(self.token_stream.items[self.head].tag), self.input[self.token_stream.items[self.head].pos.from..self.token_stream.items[self.head].pos.to] });
         return self.token_stream.items[self.head];
     }
 
@@ -165,7 +165,7 @@ pub const Parser = struct {
 
     pub fn parse_paren(self: *Parser) ParserError!Expression {
 
-        // writer.print("Entering paren\n", .{});
+        // writer.print("Entering paren", .{});
         // Paren can be for grouping (has .Comma) or simply to wrap an Expression
         // Lookahead for commas
         var level: i32 = 0;
@@ -231,7 +231,7 @@ pub const Parser = struct {
 
         const func = Expression{ .type = .FunctionCall, .value = null, .pos = self.current.pos, .children = children.ptr };
 
-        std.log.debug(">>>>{}\n", .{args});
+        std.log.debug(">>>>{}", .{args});
 
         return func;
     }
@@ -256,7 +256,7 @@ pub const Parser = struct {
                 else => return ParserError.UnexpectedToken,
             };
 
-        // writer.print("Parsed lhs: {s} text: {s}\n", .{ @tagName(lhs.type), self.input[lhs.pos.from..lhs.pos.to] });
+        // writer.print("Parsed lhs: {s} text: {s}", .{ @tagName(lhs.type), self.input[lhs.pos.from..lhs.pos.to] });
 
         while (true) {
             const op = self.peek();
@@ -379,13 +379,13 @@ fn testParser(gpa: std.mem.Allocator, source: [:0]const u8, expected_polish: []c
     // Trim trailing whitespace
     const actual_polish = std.mem.trim(u8, polish_writer.written(), " ");
 
-    std.log.debug("Expected: '{s}'\n", .{expected_polish});
-    std.log.debug("Actual:   '{s}'\n", .{actual_polish});
+    std.log.debug("Expected: '{s}'", .{expected_polish});
+    std.log.debug("Actual:   '{s}'", .{actual_polish});
 
     try std.testing.expectEqualStrings(expected_polish, actual_polish);
 
     // Print success
-    std.log.debug("Success: {s}\n", .{source});
+    std.log.debug("Success: {s}", .{source});
 }
 
 pub fn renderPolish(writer: *std.Io.Writer, expr: *const Expression, source: []const u8) std.Io.Writer.Error!void {

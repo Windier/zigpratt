@@ -104,11 +104,11 @@ pub const Tokenizer = struct {
     };
 
     pub fn dump(self: *Tokenizer, token: *const _Token) void {
-        std.log.debug("{s} \"{s}\"\n", .{ @tagName(token.tag), self.buffer[token.pos.from..(token.pos.to)] });
+        std.log.debug("{s} \"{s}\"", .{ @tagName(token.tag), self.buffer[token.pos.from..(token.pos.to)] });
     }
 
     pub fn init(buf: [:0]const u8) Tokenizer {
-        // std.log.debug("Initial string, {s}, len: {d}\n", .{writer, writer.len});
+        // std.log.debug("Initial string, {s}, len: {d}", .{writer, writer.len});
         return .{
             .buffer = buf,
             .index = 0,
@@ -122,7 +122,7 @@ pub const Tokenizer = struct {
         } };
 
         if (self.index >= self.buffer.len) {
-            // std.log.debug("Reached end of Expression\n", .{});
+            // std.log.debug("Reached end of Expression", .{});
             return .{
                 .tag = .Eof,
                 .pos = .{
@@ -264,7 +264,7 @@ pub const Tokenizer = struct {
                     },
                     else => {
                         const text = self.buffer[result.pos.from..self.index];
-                        std.log.debug("Keyword: {s}\n", .{text});
+                        std.log.debug("Keyword: {s}", .{text});
                         if (getKeyword(text)) |tag| {
                             result.tag = tag;
                             result.pos.to = self.index;
@@ -285,7 +285,7 @@ pub const Tokenizer = struct {
                     else => {
                         const text = self.buffer[result.pos.from..self.index];
                         if (getKeyword(text)) |tag| {
-                            std.log.debug("Keyword found: {s} -> {s}\n", .{ text, @tagName(tag) });
+                            std.log.debug("Keyword found: {s} -> {s}", .{ text, @tagName(tag) });
                             if (tag == .OperatorName) {
                                 result.pos.from = self.index;
                                 continue :state .operator_name;
@@ -328,7 +328,7 @@ fn testTokenize(source: [:0]const u8, expected_token_tags: []const TokenType) !v
     try std.testing.expectEqual(source.len, last_token.pos.to);
 
     // Print success
-    std.log.debug("Success: {s}\n", .{source});
+    std.log.debug("Success: {s}", .{source});
 }
 
 test "Testing Tokenizer" {

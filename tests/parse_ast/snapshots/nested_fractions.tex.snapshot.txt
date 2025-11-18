@@ -1,94 +1,32 @@
-Output Format: ast
-Tokens:
-ControlSequence(\frac)
-GroupOpen({)
-Text(1)
-GroupClose(})
-GroupOpen({)
-ControlSequence(\frac)
-GroupOpen({)
-Text(2)
-GroupClose(})
-GroupOpen({)
-Text(3)
-GroupClose(})
-GroupClose(})
-error(gpa): memory address 0x104de0000 leaked: 
-[1m/Users/jan/zig/0.14.0/files/lib/std/array_list.zig:119:58[0m: [2m0x104b6bb5f in toOwnedSlice (zemml)[0m
-            const new_memory = try allocator.alignedAlloc(T, alignment, self.items.len);
-                                                         [32m^[0m
-[1m/Users/jan/projects/zemml/src/tex_ast_parser.zig:47:63[0m: [2m0x104b6af6f in _parse (zemml)[0m
-                    .children = try child_indices.toOwnedSlice(),
-                                                              [32m^[0m
-[1m/Users/jan/projects/zemml/src/tex_ast_parser.zig:8:15[0m: [2m0x104b6be33 in do (zemml)[0m
-    try _parse(gpa, &nodes, tokens);
-              [32m^[0m
-[1m/Users/jan/projects/zemml/src/main.zig:51:40[0m: [2m0x104b6d4c7 in main (zemml)[0m
-    const nodes = try tex_ast_parser.do(gpa, tokens);
-                                       [32m^[0m
-[1m/Users/jan/zig/0.14.0/files/lib/std/start.zig:656:37[0m: [2m0x104b6f963 in main (zemml)[0m
-            const result = root.main() catch |err| {
-                                    [32m^[0m
-[1m???:?:?[0m: [2m0x18e03c273 in ??? (???)[0m
+info: Output Format: ast
 
-error(gpa): memory address 0x104de0004 leaked: 
-[1m/Users/jan/zig/0.14.0/files/lib/std/array_list.zig:119:58[0m: [2m0x104b6bb5f in toOwnedSlice (zemml)[0m
-            const new_memory = try allocator.alignedAlloc(T, alignment, self.items.len);
-                                                         [32m^[0m
-[1m/Users/jan/projects/zemml/src/tex_ast_parser.zig:47:63[0m: [2m0x104b6af6f in _parse (zemml)[0m
-                    .children = try child_indices.toOwnedSlice(),
-                                                              [32m^[0m
-[1m/Users/jan/projects/zemml/src/tex_ast_parser.zig:35:27[0m: [2m0x104b6ada3 in _parse (zemml)[0m
-                try _parse(gpa, nodes, group_tokens);
-                          [32m^[0m
-[1m/Users/jan/projects/zemml/src/tex_ast_parser.zig:8:15[0m: [2m0x104b6be33 in do (zemml)[0m
-    try _parse(gpa, &nodes, tokens);
-              [32m^[0m
-[1m/Users/jan/projects/zemml/src/main.zig:51:40[0m: [2m0x104b6d4c7 in main (zemml)[0m
-    const nodes = try tex_ast_parser.do(gpa, tokens);
-                                       [32m^[0m
-[1m/Users/jan/zig/0.14.0/files/lib/std/start.zig:656:37[0m: [2m0x104b6f963 in main (zemml)[0m
-            const result = root.main() catch |err| {
-                                    [32m^[0m
+debug: Keyword found: frac -> Fraction
+debug: Fraction "frac"
+debug: LBrace "{"
+debug: Integer "1"
+debug: RBrace "}"
+debug: LBrace "{"
+debug: Keyword found: frac -> Fraction
+debug: Fraction "frac"
+debug: LBrace "{"
+debug: Integer "2"
+debug: RBrace "}"
+debug: LBrace "{"
+debug: Integer "3"
+debug: RBrace "}"
+debug: RBrace "}"
+debug: Invalid "
+"
+debug: --eof--
+info: Token stream length: 14
+debug: Current token: Fraction text: frac
+error: UnexpectedToken
+[1m/Users/jan/projects/zig-tex/src/parser.zig:256:25[0m: [2m0x10210a193 in parse (zig-tex)[0m
+                else => return ParserError.UnexpectedToken,
+                        [32m^[0m
+[1m/Users/jan/projects/zig-tex/src/main.zig:56:17[0m: [2m0x102106dd7 in main (zig-tex)[0m
+    const ast = try parser.parse(0);
+                [32m^[0m
 
-error(gpa): memory address 0x104de0008 leaked: 
-[1m/Users/jan/zig/0.14.0/files/lib/std/array_list.zig:119:58[0m: [2m0x104b6bb5f in toOwnedSlice (zemml)[0m
-            const new_memory = try allocator.alignedAlloc(T, alignment, self.items.len);
-                                                         [32m^[0m
-[1m/Users/jan/projects/zemml/src/tex_ast_parser.zig:47:63[0m: [2m0x104b6af6f in _parse (zemml)[0m
-                    .children = try child_indices.toOwnedSlice(),
-                                                              [32m^[0m
-[1m/Users/jan/projects/zemml/src/tex_ast_parser.zig:35:27[0m: [2m0x104b6ada3 in _parse (zemml)[0m
-                try _parse(gpa, nodes, group_tokens);
-                          [32m^[0m
-[1m/Users/jan/projects/zemml/src/tex_ast_parser.zig:8:15[0m: [2m0x104b6be33 in do (zemml)[0m
-    try _parse(gpa, &nodes, tokens);
-              [32m^[0m
-[1m/Users/jan/projects/zemml/src/main.zig:51:40[0m: [2m0x104b6d4c7 in main (zemml)[0m
-    const nodes = try tex_ast_parser.do(gpa, tokens);
-                                       [32m^[0m
-[1m/Users/jan/zig/0.14.0/files/lib/std/start.zig:656:37[0m: [2m0x104b6f963 in main (zemml)[0m
-            const result = root.main() catch |err| {
-                                    [32m^[0m
 
-error(gpa): memory address 0x104d20020 leaked: 
-[1m/Users/jan/zig/0.14.0/files/lib/std/array_list.zig:119:58[0m: [2m0x104b6bb5f in toOwnedSlice (zemml)[0m
-            const new_memory = try allocator.alignedAlloc(T, alignment, self.items.len);
-                                                         [32m^[0m
-[1m/Users/jan/projects/zemml/src/tex_ast_parser.zig:47:63[0m: [2m0x104b6af6f in _parse (zemml)[0m
-                    .children = try child_indices.toOwnedSlice(),
-                                                              [32m^[0m
-[1m/Users/jan/projects/zemml/src/tex_ast_parser.zig:8:15[0m: [2m0x104b6be33 in do (zemml)[0m
-    try _parse(gpa, &nodes, tokens);
-              [32m^[0m
-[1m/Users/jan/projects/zemml/src/main.zig:51:40[0m: [2m0x104b6d4c7 in main (zemml)[0m
-    const nodes = try tex_ast_parser.do(gpa, tokens);
-                                       [32m^[0m
-[1m/Users/jan/zig/0.14.0/files/lib/std/start.zig:656:37[0m: [2m0x104b6f963 in main (zemml)[0m
-            const result = root.main() catch |err| {
-                                    [32m^[0m
-[1m???:?:?[0m: [2m0x18e03c273 in ??? (???)[0m
-
-Command: "\frac"
-
- ----- EXIT CODE: 0 -----
+ ----- EXIT CODE: 1 -----

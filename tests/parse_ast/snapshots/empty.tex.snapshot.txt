@@ -1,5 +1,14 @@
-Output Format: ast
-Tokens:
-Root: ""
+info: Output Format: ast
 
- ----- EXIT CODE: 0 -----
+debug: --eof--
+info: Token stream length: 0
+error: UnexpectedToken
+[1m/Users/jan/projects/zig-tex/src/parser.zig:256:25[0m: [2m0x102f9e193 in parse (zig-tex)[0m
+                else => return ParserError.UnexpectedToken,
+                        [32m^[0m
+[1m/Users/jan/projects/zig-tex/src/main.zig:56:17[0m: [2m0x102f9add7 in main (zig-tex)[0m
+    const ast = try parser.parse(0);
+                [32m^[0m
+
+
+ ----- EXIT CODE: 1 -----

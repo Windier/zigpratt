@@ -1,19 +1,24 @@
-Output Format: ast
-Tokens:
-ControlSequence(\sqrt)
-OptionalArgOpen([)
-Text(3)
-OptionalArgClose(])
-GroupOpen({)
-Text(x)
-GroupClose(})
-Root: ""
-  Command: "\sqrt"
-  Text: "3"
-  OptionalArg: "["
-    Text: "3"
-  Text: "x"
-  Group: "{"
-    Text: "x"
+info: Output Format: ast
 
- ----- EXIT CODE: 0 -----
+debug: Invalid "sqrt"
+debug: LBrak "["
+debug: Integer "3"
+debug: RBrak "]"
+debug: LBrace "{"
+debug: Variable "x"
+debug: RBrace "}"
+debug: Invalid "
+"
+debug: --eof--
+info: Token stream length: 8
+debug: Current token: Invalid text: sqrt
+error: UnexpectedToken
+[1m/Users/jan/projects/zig-tex/src/parser.zig:256:25[0m: [2m0x10482a193 in parse (zig-tex)[0m
+                else => return ParserError.UnexpectedToken,
+                        [32m^[0m
+[1m/Users/jan/projects/zig-tex/src/main.zig:56:17[0m: [2m0x104826dd7 in main (zig-tex)[0m
+    const ast = try parser.parse(0);
+                [32m^[0m
+
+
+ ----- EXIT CODE: 1 -----

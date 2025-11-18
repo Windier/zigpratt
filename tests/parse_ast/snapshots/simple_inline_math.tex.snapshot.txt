@@ -1,19 +1,22 @@
-Output Format: ast
-Tokens:
-MathInlineToggle($)
-Text(a)
-Symbol(+)
-Text(b)
-Symbol(=)
-Text(c)
-MathInlineToggle($)
-Root: ""
-  MathInline: "$"
-  Text: "a"
-  Symbol: "+"
-  Text: "b"
-  Symbol: "="
-  Text: "c"
-  MathInline: "$"
+info: Output Format: ast
 
- ----- EXIT CODE: 0 -----
+debug: Invalid "$"
+debug: Variable "a"
+debug: Op "+"
+debug: Variable "b"
+debug: Op "="
+debug: Variable "c"
+debug: Invalid "$"
+debug: --eof--
+info: Token stream length: 7
+debug: Current token: Invalid text: $
+error: UnexpectedToken
+[1m/Users/jan/projects/zig-tex/src/parser.zig:256:25[0m: [2m0x10219a193 in parse (zig-tex)[0m
+                else => return ParserError.UnexpectedToken,
+                        [32m^[0m
+[1m/Users/jan/projects/zig-tex/src/main.zig:56:17[0m: [2m0x102196dd7 in main (zig-tex)[0m
+    const ast = try parser.parse(0);
+                [32m^[0m
+
+
+ ----- EXIT CODE: 1 -----

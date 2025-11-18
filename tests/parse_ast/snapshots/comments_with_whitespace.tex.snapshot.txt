@@ -1,15 +1,51 @@
-Output Format: ast
-Tokens:
-Comment(% this is a comment)
-Text(a)
-Symbol(+)
-Text(b)
-Comment(% inline comment)
-Root: ""
-  Comment: "% this is a comment"
-  Text: "a"
-  Symbol: "+"
-  Text: "b"
-  Comment: "% inline comment"
+info: Output Format: ast
 
- ----- EXIT CODE: 0 -----
+debug: Invalid "%"
+debug: Variable "t"
+debug: Variable "h"
+debug: Variable "i"
+debug: Variable "s"
+debug: Variable "i"
+debug: Variable "s"
+debug: Variable "a"
+debug: Variable "c"
+debug: Variable "o"
+debug: Variable "m"
+debug: Variable "m"
+debug: Variable "e"
+debug: Variable "n"
+debug: Variable "t"
+debug: Invalid "
+"
+debug: Variable "a"
+debug: Op "+"
+debug: Variable "b"
+debug: Invalid "%"
+debug: Variable "i"
+debug: Variable "n"
+debug: Variable "l"
+debug: Variable "i"
+debug: Variable "n"
+debug: Variable "e"
+debug: Variable "c"
+debug: Variable "o"
+debug: Variable "m"
+debug: Variable "m"
+debug: Variable "e"
+debug: Variable "n"
+debug: Variable "t"
+debug: Invalid "
+"
+debug: --eof--
+info: Token stream length: 34
+debug: Current token: Invalid text: %
+error: UnexpectedToken
+[1m/Users/jan/projects/zig-tex/src/parser.zig:256:25[0m: [2m0x10067a193 in parse (zig-tex)[0m
+                else => return ParserError.UnexpectedToken,
+                        [32m^[0m
+[1m/Users/jan/projects/zig-tex/src/main.zig:56:17[0m: [2m0x100676dd7 in main (zig-tex)[0m
+    const ast = try parser.parse(0);
+                [32m^[0m
+
+
+ ----- EXIT CODE: 1 -----

@@ -1,19 +1,25 @@
-Output Format: ast
-Tokens:
-Text(x)
-Symbol(~)
-Text(y)
-ControlSequence(\approx)
-Text(z)
-ControlSequence(\neq)
-Text(a)
-Root: ""
-  Text: "x"
-  Symbol: "~"
-  Text: "y"
-  Command: "\approx"
-  Text: "z"
-  Command: "\neq"
-  Text: "a"
+info: Output Format: ast
 
- ----- EXIT CODE: 0 -----
+debug: Variable "x"
+debug: Invalid "~"
+debug: Variable "y"
+debug: Invalid "approx"
+debug: Variable "z"
+debug: Invalid "neq"
+debug: Variable "a"
+debug: Invalid "
+"
+debug: --eof--
+info: Token stream length: 8
+debug: Current token: Variable text: x
+debug: Peeking token: Invalid text: ~
+error: UnexpectedToken
+[1m/Users/jan/projects/zig-tex/src/parser.zig:275:25[0m: [2m0x100a9a3bb in parse (zig-tex)[0m
+                else => return ParserError.UnexpectedToken,
+                        [32m^[0m
+[1m/Users/jan/projects/zig-tex/src/main.zig:56:17[0m: [2m0x100a96dd7 in main (zig-tex)[0m
+    const ast = try parser.parse(0);
+                [32m^[0m
+
+
+ ----- EXIT CODE: 1 -----

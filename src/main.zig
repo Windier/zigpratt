@@ -1,5 +1,4 @@
 const std = @import("std");
-const print = std.debug.print;
 
 const tex = @import("tex");
 
@@ -23,7 +22,7 @@ pub fn main() !void {
 
     const arg_parser = arg_parse.ArgParser.parse(args[1..]);
 
-    std.debug.print("Output Format: {s}\n", .{@tagName(arg_parser.output_format)});
+    std.log.info("Output Format: {s}\n", .{@tagName(arg_parser.output_format)});
 
     var expr: [:0]u8 = undefined;
     if (arg_parser.input_file_path) |input_file_path| {
@@ -45,7 +44,7 @@ pub fn main() !void {
 
     while (tokenizer.next()) |token| {
         if (token.tag == .Eof) {
-            print("--eof--\n", .{});
+            std.log.debug("--eof--", .{});
             break;
         }
         try token_stream.append(gpa, token);
@@ -53,9 +52,9 @@ pub fn main() !void {
     }
 
     var parser = tex.Parser.init(token_stream, expr, arena);
-    print("Token stream length: {d}\n", .{token_stream.items.len});
+    std.log.info("Token stream length: {d}", .{token_stream.items.len});
     const ast = try parser.parse(0);
-    print("input: {}\n", .{ast});
+    std.log.info("input: {}", .{ast});
 
     const render: tex.RenderFunctionType = switch (arg_parser.output_format) {
         .ast => tex.renderAST,
