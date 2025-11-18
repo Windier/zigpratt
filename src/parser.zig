@@ -2,6 +2,7 @@ const std = @import("std");
 const expect = std.testing.expect;
 const ArrayList = std.ArrayList;
 
+const printDebug = @import("debug.zig").printDebug;
 const tok = @import("tokenizer.zig");
 
 const input = enum { Op, Atom, Invalid };
@@ -114,7 +115,7 @@ pub const Parser = struct {
             return;
         }
         self.current = self.token_stream.items[self.head];
-        std.log.debug("Current token: {s} text: {s}\n", .{ @tagName(self.current.tag), self.input[self.current.pos.from..self.current.pos.to] });
+        printDebug("Current token: {s} text: {s}\n", .{ @tagName(self.current.tag), self.input[self.current.pos.from..self.current.pos.to] });
         self.head += 1;
     }
 
@@ -122,7 +123,7 @@ pub const Parser = struct {
         if (self.head >= self.token_stream.items.len) {
             return .{ .tag = .Eof, .pos = .{ .from = 0, .to = 0 } };
         }
-        std.log.debug("Peeking token: {s} text: {s}\n", .{ @tagName(self.token_stream.items[self.head].tag), self.input[self.token_stream.items[self.head].pos.from..self.token_stream.items[self.head].pos.to] });
+        printDebug("Peeking token: {s} text: {s}\n", .{ @tagName(self.token_stream.items[self.head].tag), self.input[self.token_stream.items[self.head].pos.from..self.token_stream.items[self.head].pos.to] });
         return self.token_stream.items[self.head];
     }
 
@@ -231,7 +232,7 @@ pub const Parser = struct {
 
         const func = Expression{ .type = .FunctionCall, .value = null, .pos = self.current.pos, .children = children.ptr };
 
-        std.log.debug(">>>>{}\n", .{args});
+        printDebug(">>>>{}\n", .{args});
 
         return func;
     }
@@ -379,13 +380,13 @@ fn testParser(gpa: std.mem.Allocator, source: [:0]const u8, expected_polish: []c
     // Trim trailing whitespace
     const actual_polish = std.mem.trim(u8, polish_writer.written(), " ");
 
-    std.log.debug("Expected: '{s}'\n", .{expected_polish});
-    std.log.debug("Actual:   '{s}'\n", .{actual_polish});
+    printDebug("Expected: '{s}'\n", .{expected_polish});
+    printDebug("Actual:   '{s}'\n", .{actual_polish});
 
     try std.testing.expectEqualStrings(expected_polish, actual_polish);
 
     // Print success
-    std.log.debug("Success: {s}\n", .{source});
+    printDebug("Success: {s}\n", .{source});
 }
 
 pub fn renderPolish(writer: *std.Io.Writer, expr: *const Expression, source: []const u8) std.Io.Writer.Error!void {
