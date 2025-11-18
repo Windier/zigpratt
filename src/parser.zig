@@ -371,9 +371,8 @@ fn testParser(gpa: std.mem.Allocator, source: [:0]const u8, expected_polish: []c
     // Convert Polish notation to string
     var polish_writer: std.Io.Writer.Allocating = .init(arena);
     defer polish_writer.deinit();
-    var writer = polish_writer.writer;
 
-    try renderPolish(&writer, &ast, source);
+    try renderPolish(&polish_writer.writer, &ast, source);
 
     // Trim trailing whitespace
     const actual_polish = std.mem.trim(u8, polish_writer.written(), " ");

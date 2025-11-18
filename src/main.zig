@@ -34,7 +34,7 @@ pub fn main() !void {
         _ = try fr.interface.streamRemaining(&aw.writer);
         expr = try aw.toOwnedSliceSentinel(0);
     } else {
-        var fr = std.fs.File.stdin().reader(&.{});
+        var fr = std.fs.File.stdin().reader(&ip_buffer);
         var aw: std.Io.Writer.Allocating = .init(gpa);
         _ = try fr.interface.streamRemaining(&aw.writer);
         expr = try aw.toOwnedSliceSentinel(0);
