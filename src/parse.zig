@@ -2,7 +2,7 @@ const std = @import("std");
 const expect = std.testing.expect;
 const ArrayList = std.ArrayList;
 
-const tok = @import("tokenizer.zig");
+const tok = @import("tokenize.zig");
 
 const input = enum { Op, Atom, Invalid };
 
